@@ -64,6 +64,10 @@ class DriveService:
         return url, state
 
     def handle_callback(self, authorization_response, state):
+        # Garante que a URL seja tratada estritamente como HTTPS para o Render
+        if authorization_response.startswith("http://"):
+            authorization_response = authorization_response.replace("http://", "https://", 1)
+
         flow = self._flow(state=state)
         flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
