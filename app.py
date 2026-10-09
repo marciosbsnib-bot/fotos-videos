@@ -7,15 +7,23 @@ from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, session, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import db, User, Media, Album, Like, Favorite, View, AuditLog, SiteSetting
 from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
 
+# Exige HTTPS obrigatoriamente para as chamadas de OAuth
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '0'
+
 load_dotenv()
 
 app = Flask(__name__)
+
+# Correção de Proxy do Render para reconhecer requisições HTTPS
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-me")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///meu_espaco.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
