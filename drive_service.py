@@ -9,8 +9,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from models import db, SiteSetting
 
-# Desativa verificação rígida de escopo para aceitar escopos retornados pelo Google
+# Desativa a verificação estrita de escopo retornado para aceitar os escopos do Google Drive
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
 
 class DriveConfigError(RuntimeError):
     pass
@@ -33,7 +34,7 @@ class DriveService:
         if not self.key:
             raise DriveConfigError("Configure TOKEN_ENCRYPTION_KEY para proteger o token do Drive.")
 
-        # Força o uso estrito de HTTPS na URI de redirecionamento
+        # Força o uso estrito de HTTPS na URI de redirecionamento para o Render
         if self.redirect_uri and self.redirect_uri.startswith("http://"):
             self.redirect_uri = self.redirect_uri.replace("http://", "https://", 1)
 
@@ -50,18 +51,17 @@ class DriveService:
                 "redirect_uris": [self.redirect_uri],
             }
         }
-        return Flow.from_client_config(
+        flow = Flow.from_client_config(
             client_config,
             scopes=SCOPES,
             state=state,
         )
+        flow.redirect_uri = self.redirect_uri
+        return flow
 
     def authorization_url(self):
         state = secrets.token_urlsafe(32)
         flow = self._flow(state=state)
-        # Passa explicitamente a redirect_uri para não gerar inconsistência na requisição
-        flow.redirect_uri = self.redirect_uri
-        
         url, _ = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
@@ -70,18 +70,17 @@ class DriveService:
         return url, state
 
     def handle_callback(self, authorization_response, state):
-        # Corrige retorno do proxy do Render para HTTPS
+        # Converte a resposta enviada pelo proxy do Render de HTTP para HTTPS
         if authorization_response.startswith("http://"):
             authorization_response = authorization_response.replace("http://", "https://", 1)
 
         flow = self._flow(state=state)
-        flow.redirect_uri = self.redirect_uri
         flow.fetch_token(authorization_response=authorization_response)
-        
         credentials = flow.credentials
+
         if not credentials.refresh_token:
             raise DriveConfigError("O Google não retornou refresh token. Reconecte com consentimento.")
-        
+
         encrypted = self._fernet().encrypt(credentials.refresh_token.encode()).decode()
         item = SiteSetting.query.filter_by(key="drive_refresh_token").first()
         if not item:

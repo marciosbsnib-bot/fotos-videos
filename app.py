@@ -14,15 +14,15 @@ from models import db, User, Media, Album, Like, Favorite, View, AuditLog, SiteS
 from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
 
-# Exige HTTPS obrigatoriamente para as chamadas de OAuth
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '0'
+# Permite que a biblioteca aceite o cabeçalho HTTPS vindo do Proxy do Render
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Correção de Proxy do Render para reconhecer requisições HTTPS
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+# Correção completa de Proxy do Render para repassar proto, host e port
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-me")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///meu_espaco.db")
