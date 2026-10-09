@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar"><div><h1>Usuários</h1><p class="muted">Aprovação e níveis de acesso.</p></div></header>
+<div class="table-wrap"><table>
+<tr><th>Nome</th><th>E-mail</th><th>Status</th><th>Nível</th><th>Ações</th></tr>
+{% for u in users %}
+<tr>
+<td>{{ u.name }}</td><td>{{ u.email }}</td>
+<td><span class="badge">{{ u.status }}</span></td>
+<td>{{ u.access_level }}</td>
+<td>
+{% if u.status == "PENDING" %}
+<form class="inline" method="post" action="{{ url_for('admin_approve_user', user_id=u.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<select name="access_level"><option value="BASIC">Básico</option><option value="NORMAL">Normal</option></select>
+<button class="small primary">Aprovar</button>
+</form>
+{% else %}
+<form class="inline" method="post" action="{{ url_for('admin_change_level', user_id=u.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<select name="access_level">
+<option value="BASIC" {% if u.access_level=="BASIC" %}selected{% endif %}>Básico</option>
+<option value="NORMAL" {% if u.access_level=="NORMAL" %}selected{% endif %}>Normal</option>
+<option value="ADMIN" {% if u.access_level=="ADMIN" %}selected{% endif %}>Admin</option>
+</select><button class="small secondary">Salvar</button>
+</form>
+{% if u.id != current_user.id %}
+<form class="inline" method="post" action="{{ url_for('admin_block_user', user_id=u.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="small danger">Bloquear</button>
+</form>
+{% endif %}
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</table></div>
+{% endblock %}

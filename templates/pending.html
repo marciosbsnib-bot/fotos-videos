@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="center-card">
+  <div class="status-icon">◷</div>
+  <h1>Aguardando aprovação</h1>
+  <p>Seu cadastro foi realizado com sucesso. O administrador ainda precisa aprovar seu acesso.</p>
+  <p class="muted">{{ user.email }}</p>
+  <a class="secondary button" href="{{ url_for('login') }}">Voltar para o login</a>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title or "Meu Espaço" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<div class="app">
+  {% if current_user.is_authenticated and current_user.status == "APPROVED" %}
+  <aside class="sidebar">
+    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">M</span> Meu Espaço</a>
+    <nav>
+      <a href="{{ url_for('index') }}">⌂ Início</a>
+      <a href="{{ url_for('favorites') }}">♡ Favoritos</a>
+      <a href="{{ url_for('likes') }}">♡ Curtidas</a>
+    </nav>
+    {% if current_user.access_level == "ADMIN" %}
+    <div class="nav-title">ADMINISTRAÇÃO</div>
+    <nav>
+      <a href="{{ url_for('admin_dashboard') }}">▦ Painel Admin</a>
+      <a href="{{ url_for('admin_users') }}">♙ Usuários</a>
+      <a href="{{ url_for('admin_albums') }}">▣ Álbuns</a>
+      <a href="{{ url_for('admin_logs') }}">≡ Logs</a>
+      <a href="{{ url_for('admin_settings') }}">⚙ Configurações</a>
+      <a href="{{ url_for('admin_drive') }}">☁ Google Drive</a>
+    </nav>
+    {% endif %}
+    <div class="sidebar-bottom">
+      <span>{{ current_user.name }}</span>
+      <a href="{{ url_for('logout') }}">Sair</a>
+    </div>
+  </aside>
+  {% endif %}
+
+  <main class="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

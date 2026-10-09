@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viewer">
+  <header class="viewer-top">
+    <a href="{{ url_for('album', album_id=media.album_id) }}">← {{ media.album.name }}</a>
+    <span>{{ media.name }}</span>
+    <a href="{{ url_for('index') }}">×</a>
+  </header>
+  <div class="viewer-stage">
+    {% if media.mime_type and media.mime_type.startswith("video/") %}
+      <video controls playsinline class="video" src="{{ url_for('stream_media', media_id=media.id) }}"></video>
+    {% else %}
+      <img id="photo" class="photo" src="{{ url_for('stream_media', media_id=media.id) }}" alt="{{ media.name }}">
+    {% endif %}
+  </div>
+  <div class="viewer-controls">
+    {% if settings.show_views %}<span>👁 {{ view_count }}</span>{% endif %}
+    {% if settings.show_likes %}<span>👍 {{ like_count }}</span>{% endif %}
+    {% if settings.show_favorites %}<span>❤️ {{ favorite_count }}</span>{% endif %}
+    <form method="post" action="{{ url_for('toggle_like', media_id=media.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="icon-btn {% if liked %}active{% endif %}">👍 {{ "Curtido" if liked else "Curtir" }}</button>
+    </form>
+    <form method="post" action="{{ url_for('toggle_favorite', media_id=media.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="icon-btn {% if favorite %}active-heart{% endif %}">♥ {{ "Favorito" if favorite else "Favoritar" }}</button>
+    </form>
+    {% if not media.mime_type or not media.mime_type.startswith("video/") %}
+      <button class="icon-btn" onclick="toggleFullscreen()">⛶ Tela cheia</button>
+      <button class="icon-btn" onclick="zoomPhoto(1.2)">＋ Zoom</button>
+      <button class="icon-btn" onclick="zoomPhoto(.83)">− Zoom</button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

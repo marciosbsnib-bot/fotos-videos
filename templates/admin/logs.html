@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar"><div><h1>Logs</h1><p class="muted">Atividade recente.</p></div></header>
+<div class="table-wrap"><table>
+<tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Arquivo</th><th>Detalhes</th></tr>
+{% for l in logs %}
+<tr><td>{{ l.created_at }}</td><td>{{ l.user.email if l.user else "-" }}</td><td>{{ l.action }}</td><td>{{ l.media.name if l.media else "-" }}</td><td>{{ l.details }}</td></tr>
+{% endfor %}
+</table></div>
+{% endblock %}

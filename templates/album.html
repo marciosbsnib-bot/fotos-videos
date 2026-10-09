@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar">
+  <div><a class="back" href="{{ url_for('index') }}">← Álbuns</a><h1>{{ album.name }}</h1></div>
+  <span class="badge {{ album.access_classification|lower }}">{{ album.access_classification }}</span>
+</header>
+<div class="media-grid">
+{% for item in media %}
+  <a class="media-card" href="{{ url_for('media_view', media_id=item.id) }}">
+    <div class="thumb">{{ "▶" if item.mime_type and item.mime_type.startswith("video/") else "▧" }}</div>
+    <div class="media-name">{{ item.name }}</div>
+  </a>
+{% else %}
+  <div class="empty">Nenhuma mídia neste álbum.</div>
+{% endfor %}
+</div>
+{% endblock %}

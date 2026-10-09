@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar"><div><h1>Configurações</h1><p class="muted">Controle o que aparece para os usuários.</p></div></header>
+<form class="settings-card" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="check"><input type="checkbox" name="show_views" {% if show_views %}checked{% endif %}> Mostrar contador de visualizações</label>
+<label class="check"><input type="checkbox" name="show_likes" {% if show_likes %}checked{% endif %}> Mostrar contador de curtidas</label>
+<label class="check"><input type="checkbox" name="show_favorites" {% if show_favorites %}checked{% endif %}> Mostrar contador de favoritos</label>
+<button class="primary">Salvar configurações</button>
+</form>
+{% endblock %}

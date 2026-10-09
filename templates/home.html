@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar">
+  <div><h1>Meus Álbuns</h1><p class="muted">Suas memórias, organizadas do seu jeito.</p></div>
+  <div class="user-pill">{{ current_user.name }}</div>
+</header>
+<section class="album-grid">
+{% for album in albums %}
+  <a class="album-card" href="{{ url_for('album', album_id=album.id) }}">
+    <div class="album-cover">{{ album.name[:1]|upper }}</div>
+    <div class="album-info">
+      <h3>{{ album.name }}</h3>
+      <span class="badge {{ album.access_classification|lower }}">{{ album.access_classification }}</span>
+    </div>
+  </a>
+{% else %}
+  <div class="empty">Nenhum álbum disponível ainda.</div>
+{% endfor %}
+</section>
+{% endblock %}

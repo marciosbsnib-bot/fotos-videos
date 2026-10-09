@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar"><div><h1>Painel administrativo</h1><p class="muted">Visão geral do Meu Espaço.</p></div></header>
+<div class="stats">
+{% for label,value in [("Usuários",stats.users),("Pendentes",stats.pending),("Álbuns",stats.albums),("Arquivos",stats.media),("Curtidas",stats.likes),("Favoritos",stats.favorites),("Visualizações",stats.views)] %}
+<div class="stat"><strong>{{ value }}</strong><span>{{ label }}</span></div>
+{% endfor %}
+</div>
+{% endblock %}

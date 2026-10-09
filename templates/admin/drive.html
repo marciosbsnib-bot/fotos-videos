@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar"><div><h1>Google Drive</h1><p class="muted">A conta do administrador fornece acesso privado aos arquivos.</p></div></header>
+<div class="settings-card">
+{% if connected %}
+<p class="success-text">✓ Google Drive conectado.</p>
+<p class="muted">O refresh token é armazenado criptografado no banco.</p>
+{% else %}
+<p>O Drive ainda não está conectado.</p>
+{% endif %}
+<a class="primary button" href="{{ url_for('admin_drive_connect') }}">{{ "Reconectar" if connected else "Conectar Google Drive" }}</a>
+
+<hr>
+<h2>Sincronizar uma pasta</h2>
+<p class="muted">Cole o ID da pasta do Google Drive. Somente imagens e vídeos da pasta são importados nesta versão.</p>
+<form class="settings-card" method="post" action="{{ url_for('admin_drive_sync') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>ID da pasta do Drive<input name="folder_id" required placeholder="1AbCdEf..." /></label>
+<label>Nome do álbum<input name="album_name" required placeholder="Carnaval 2025" /></label>
+<label>Classificação<select name="classification"><option value="PUBLIC">Público</option><option value="NORMAL">Normal</option><option value="RESTRICTED">Restrito</option></select></label>
+<button class="primary">Sincronizar pasta</button>
+</form>
+</div>
+{% endblock %}

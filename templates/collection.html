@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar"><div><h1>{{ title }}</h1><p class="muted">Somente itens associados à sua conta.</p></div></header>
+<div class="media-grid">
+{% for item in media %}
+  <a class="media-card" href="{{ url_for('media_view', media_id=item.id) }}">
+    <div class="thumb">{{ "▶" if item.mime_type and item.mime_type.startswith("video/") else "▧" }}</div>
+    <div class="media-name">{{ item.name }}</div>
+  </a>
+{% else %}<div class="empty">Nenhum item ainda.</div>{% endfor %}
+</div>
+{% endblock %}
