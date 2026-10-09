@@ -1,16 +1,16 @@
 import os
 import secrets
 import tempfile
-from urllib.parse import urlencode
 
 from cryptography.fernet import Fernet
-from flask import current_app
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from models import db, SiteSetting
 
+# Força a lib a não rejeitar respostas HTTPS em servidores com proxy
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
 class DriveConfigError(RuntimeError):
     pass
@@ -32,6 +32,10 @@ class DriveService:
             )
         if not self.key:
             raise DriveConfigError("Configure TOKEN_ENCRYPTION_KEY para proteger o token do Drive.")
+
+        # Garante que a URI configurada use HTTPS
+        if self.redirect_uri.startswith("http://"):
+            self.redirect_uri = self.redirect_uri.replace("http://", "https://", 1)
 
     def _fernet(self):
         return Fernet(self.key.encode())
@@ -64,7 +68,7 @@ class DriveService:
         return url, state
 
     def handle_callback(self, authorization_response, state):
-        # Garante que a URL seja tratada estritamente como HTTPS para o Render
+        # Corrige o cabeçalho se o Render repassar como HTTP internamente
         if authorization_response.startswith("http://"):
             authorization_response = authorization_response.replace("http://", "https://", 1)
 
