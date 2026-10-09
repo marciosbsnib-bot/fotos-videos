@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from models import db, SiteSetting
 
-# Desativa a verificação estrita de escopo retornado para aceitar os escopos do Google Drive
+# Desativa a verificação estrita para tolerar escopos retornados pelo Google
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
 
@@ -34,7 +34,7 @@ class DriveService:
         if not self.key:
             raise DriveConfigError("Configure TOKEN_ENCRYPTION_KEY para proteger o token do Drive.")
 
-        # Força o uso estrito de HTTPS na URI de redirecionamento para o Render
+        # Força HTTPS na redirect_uri caso o Render passe como HTTP
         if self.redirect_uri and self.redirect_uri.startswith("http://"):
             self.redirect_uri = self.redirect_uri.replace("http://", "https://", 1)
 
@@ -70,7 +70,7 @@ class DriveService:
         return url, state
 
     def handle_callback(self, authorization_response, state):
-        # Converte a resposta enviada pelo proxy do Render de HTTP para HTTPS
+        # Corrige retorno do proxy do Render de HTTP para HTTPS
         if authorization_response.startswith("http://"):
             authorization_response = authorization_response.replace("http://", "https://", 1)
 
