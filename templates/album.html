@@ -7,7 +7,16 @@
 <div class="media-grid">
 {% for item in media %}
   <a class="media-card" href="{{ url_for('media_view', media_id=item.id) }}">
-    <div class="thumb">{{ "▶" if item.mime_type and item.mime_type.startswith("video/") else "▧" }}</div>
+    <div class="thumb" style="overflow: hidden; display: flex; align-items: center; justify-content: center; background: #222;">
+      {% if item.thumbnail_url %}
+        <img src="{{ item.thumbnail_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;" referrerpolicy="no-referrer">
+      {% else %}
+        <img src="{{ url_for('stream_media', media_id=item.id) }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+      {% endif %}
+      {% if item.mime_type and item.mime_type.startswith("video/") %}
+        <span style="position: absolute; color: white; font-size: 1.5rem; text-shadow: 0 0 5px rgba(0,0,0,0.8);">▶</span>
+      {% endif %}
+    </div>
     <div class="media-name">{{ item.name }}</div>
   </a>
 {% else %}

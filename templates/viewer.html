@@ -6,29 +6,49 @@
     <span>{{ media.name }}</span>
     <a href="{{ url_for('index') }}">×</a>
   </header>
-  <div class="viewer-stage">
+  
+  <div class="viewer-stage" style="position: relative;">
+    {% if prev_media_id %}
+      <a href="{{ url_for('media_view', media_id=prev_media_id) }}" class="nav-btn prev-btn" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(0,0,0,0.6); color: white; padding: 12px 16px; text-decoration: none; border-radius: 50%; font-weight: bold; font-size: 1.2rem;">❮</a>
+    {% endif %}
+
     {% if media.mime_type and media.mime_type.startswith("video/") %}
       <video controls playsinline class="video" src="{{ url_for('stream_media', media_id=media.id) }}"></video>
     {% else %}
       <img id="photo" class="photo" src="{{ url_for('stream_media', media_id=media.id) }}" alt="{{ media.name }}">
     {% endif %}
+
+    {% if next_media_id %}
+      <a href="{{ url_for('media_view', media_id=next_media_id) }}" class="nav-btn next-btn" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(0,0,0,0.6); color: white; padding: 12px 16px; text-decoration: none; border-radius: 50%; font-weight: bold; font-size: 1.2rem;">❯</a>
+    {% endif %}
   </div>
+
   <div class="viewer-controls">
+    {% if prev_media_id %}
+      <a class="icon-btn" href="{{ url_for('media_view', media_id=prev_media_id) }}">❮ Anterior</a>
+    {% endif %}
+
     {% if settings.show_views %}<span>👁 {{ view_count }}</span>{% endif %}
     {% if settings.show_likes %}<span>👍 {{ like_count }}</span>{% endif %}
     {% if settings.show_favorites %}<span>❤️ {{ favorite_count }}</span>{% endif %}
-    <form method="post" action="{{ url_for('toggle_like', media_id=media.id) }}">
+    
+    <form method="post" action="{{ url_for('toggle_like', media_id=media.id) }}" style="display:inline;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="icon-btn {% if liked %}active{% endif %}">👍 {{ "Curtido" if liked else "Curtir" }}</button>
     </form>
-    <form method="post" action="{{ url_for('toggle_favorite', media_id=media.id) }}">
+    <form method="post" action="{{ url_for('toggle_favorite', media_id=media.id) }}" style="display:inline;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="icon-btn {% if favorite %}active-heart{% endif %}">♥ {{ "Favorito" if favorite else "Favoritar" }}</button>
     </form>
+
     {% if not media.mime_type or not media.mime_type.startswith("video/") %}
       <button class="icon-btn" onclick="toggleFullscreen()">⛶ Tela cheia</button>
       <button class="icon-btn" onclick="zoomPhoto(1.2)">＋ Zoom</button>
       <button class="icon-btn" onclick="zoomPhoto(.83)">− Zoom</button>
+    {% endif %}
+
+    {% if next_media_id %}
+      <a class="icon-btn" href="{{ url_for('media_view', media_id=next_media_id) }}">Próximo ❯</a>
     {% endif %}
   </div>
 </div>

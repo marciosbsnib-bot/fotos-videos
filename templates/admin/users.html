@@ -26,9 +26,17 @@
 </form>
 {% if u.id != current_user.id %}
 <form class="inline" method="post" action="{{ url_for('admin_block_user', user_id=u.id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="small danger">Bloquear</button>
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<button class="small danger">Bloquear</button>
 </form>
 {% endif %}
+{% endif %}
+
+{% if u.id != current_user.id %}
+<form class="inline" method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}" onsubmit="return confirm('Tem certeza que deseja deletar este usuário?');">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<button class="small danger" style="background-color: #d9534f; color: white;">Deletar</button>
+</form>
 {% endif %}
 </td>
 </tr>
