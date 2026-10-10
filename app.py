@@ -1,12 +1,14 @@
+import io
 import os
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, Response, abort, flash, redirect, render_template, request, send_file, session, stream_with_context, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect
+from googleapiclient.http import MediaIoBaseDownload
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -334,14 +336,32 @@ def likes():
 @approved_required
 def stream_media(media_id):
     media = db.session.get(Media, media_id)
-    if not media or not can_view(media):
-        abort(404)
-    if not media.drive_file_id:
+    if not media or not can_view(media) or not media.drive_file_id:
         abort(404)
     try:
         drive = DriveService()
-        path = drive.download_to_temp(media.drive_file_id)
-        return send_file(path, mimetype=media.mime_type or "application/octet-stream", conditional=True, etag=True)
+        service = drive.client()
+        request_drive = service.files().get_media(fileId=media.drive_file_id)
+
+        # Para imagens pequenas, entrega direto da temp
+        if media.mime_type and media.mime_type.startswith("image/"):
+            path = drive.download_to_temp(media.drive_file_id)
+            return send_file(path, mimetype=media.mime_type, conditional=True, etag=True)
+
+        # Streaming em tempo real sem gravar no disco para vídeos
+        def generate():
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request_drive, chunksize=1024 * 1024)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+                fh.seek(0)
+                data = fh.read()
+                fh.seek(0)
+                fh.truncate(0)
+                yield data
+
+        return Response(stream_with_context(generate()), mimetype=media.mime_type or "video/mp4")
     except DriveConfigError:
         abort(503)
 
@@ -427,7 +447,6 @@ def admin_delete_user(user_id):
         flash("Você não pode deletar sua própria conta.", "error")
         return redirect(url_for("admin_users"))
     
-    # Remove associações de interações
     Like.query.filter_by(user_id=user.id).delete()
     Favorite.query.filter_by(user_id=user.id).delete()
     View.query.filter_by(user_id=user.id).delete()
