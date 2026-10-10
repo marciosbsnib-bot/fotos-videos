@@ -382,9 +382,9 @@ def stream_media(media_id):
         return Response(stream_with_context(generate()), mimetype=media.mime_type or "video/mp4")
     except DriveConfigError:
         abort(503)
+ 
 
-
-# ---------------- ADMIN ----------------
+ # ---------------- ADMIN ----------------
 
 @app.get("/admin")
 @admin_required
@@ -538,6 +538,23 @@ def admin_album_classification(album_id):
     db.session.commit()
     audit("CHANGE_ALBUM_CLASSIFICATION", details={"album_id": album.id, "classification": classification})
     return redirect(url_for("admin_albums"))
+
+
+# NOVA ROTA: Alterar nível de acesso de um arquivo individualmente
+@app.post("/admin/media/<int:media_id>/classification")
+@admin_required
+def admin_media_classification(media_id):
+    media = db.session.get(Media, media_id)
+    if not media:
+        abort(404)
+    classification = request.form.get("classification")
+    if classification not in {"PUBLIC", "NORMAL", "RESTRICTED"}:
+        abort(400)
+    media.access_classification = classification
+    db.session.commit()
+    audit("CHANGE_MEDIA_CLASSIFICATION", details={"media_id": media.id, "classification": classification})
+    flash("Classificação do arquivo atualizada.", "success")
+    return redirect(request.referrer or url_for("album", album_id=media.album_id))
 
 
 @app.get("/admin/settings")

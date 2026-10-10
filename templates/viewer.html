@@ -23,7 +23,7 @@
     {% endif %}
   </div>
 
-  <div class="viewer-controls">
+  <div class="viewer-controls" style="flex-wrap: wrap; justify-content: center; gap: 10px;">
     {% if prev_media_id %}
       <a class="icon-btn" href="{{ url_for('media_view', media_id=prev_media_id) }}">❮ Anterior</a>
     {% endif %}
@@ -49,6 +49,19 @@
 
     {% if next_media_id %}
       <a class="icon-btn" href="{{ url_for('media_view', media_id=next_media_id) }}">Próximo ❯</a>
+    {% endif %}
+
+    {% if current_user.is_authenticated and current_user.access_level == "ADMIN" %}
+      <form method="post" action="{{ url_for('admin_media_classification', media_id=media.id) }}" style="display: inline-flex; gap: 5px; align-items: center; margin-left: 10px; background: #222; padding: 4px 8px; border-radius: 4px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span style="font-size: 0.8rem; color: #ccc;">Acesso:</span>
+        <select name="classification" style="font-size: 0.8rem; padding: 2px;">
+          <option value="PUBLIC" {% if media.access_classification=="PUBLIC" %}selected{% endif %}>Público</option>
+          <option value="NORMAL" {% if media.access_classification=="NORMAL" %}selected{% endif %}>Normal</option>
+          <option value="RESTRICTED" {% if media.access_classification=="RESTRICTED" %}selected{% endif %}>Restrito</option>
+        </select>
+        <button class="small secondary" style="font-size: 0.75rem; padding: 2px 6px;">Alterar</button>
+      </form>
     {% endif %}
   </div>
 </div>
