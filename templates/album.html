@@ -7,17 +7,25 @@
 <div class="media-grid">
 {% for item in media %}
   <a class="media-card" href="{{ url_for('media_view', media_id=item.id) }}">
-    <div class="thumb" style="overflow: hidden; display: flex; align-items: center; justify-content: center; background: #222;">
+    <div class="thumb" style="overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; background: #181818; aspect-ratio: 16/9; border-radius: 8px;">
       {% if item.thumbnail_url %}
         <img src="{{ item.thumbnail_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;" referrerpolicy="no-referrer">
+      {% elif item.mime_type and item.mime_type.startswith("video/") %}
+        <video src="{{ url_for('stream_media', media_id=item.id) }}#t=0.5" preload="metadata" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none;"></video>
       {% else %}
         <img src="{{ url_for('stream_media', media_id=item.id) }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
       {% endif %}
+
       {% if item.mime_type and item.mime_type.startswith("video/") %}
-        <span style="position: absolute; color: white; font-size: 1.5rem; text-shadow: 0 0 5px rgba(0,0,0,0.8);">▶</span>
+        <span style="position: absolute; color: white; font-size: 1.8rem; text-shadow: 0 0 8px rgba(0,0,0,0.8); background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 50%;">▶</span>
       {% endif %}
     </div>
-    <div class="media-name">{{ item.name }}</div>
+    <div class="media-name" style="margin-top: 6px; font-weight: 500;">{{ item.name }}</div>
+    <div class="media-stats" style="font-size: 0.8rem; color: #aaa; display: flex; gap: 10px; margin-top: 4px;">
+      {% if settings.show_views %}<span>👁 {{ item.views_cnt|default(0) }}</span>{% endif %}
+      {% if settings.show_likes %}<span>👍 {{ item.likes_cnt|default(0) }}</span>{% endif %}
+      {% if settings.show_favorites %}<span>❤️ {{ item.favs_cnt|default(0) }}</span>{% endif %}
+    </div>
   </a>
 {% else %}
   <div class="empty">Nenhuma mídia neste álbum.</div>

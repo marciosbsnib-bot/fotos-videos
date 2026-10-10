@@ -16,8 +16,7 @@ from models import db, User, Media, Album, Like, Favorite, View, AuditLog, SiteS
 from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
 
-if os.environ.get("FLASK_ENV") == "development":
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 load_dotenv()
 
@@ -57,7 +56,7 @@ with app.app_context():
                 name="Administrador",
                 status="APPROVED",
                 access_level="ADMIN",
-                password_hash=generate_password_hash(os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "Met@llica99P@ntera77")),
+                password_hash=generate_password_hash(os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "troque-esta-senha")),
             )
             db.session.add(admin)
             db.session.commit()
@@ -233,9 +232,16 @@ def album(album_id):
         if item.access_classification == "NORMAL" and current_user.access_level != "NORMAL":
             abort(403)
 
-    media = item.media.order_by(Media.created_at.desc()).all()
-    media = [m for m in media if can_view(m)]
-    return render_template("album.html", album=item, media=media)
+    media_items = item.media.order_by(Media.created_at.desc()).all()
+    media_list = []
+    for m in media_items:
+        if can_view(m):
+            m.views_cnt = View.query.filter_by(media_id=m.id).count()
+            m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
+            m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
+            media_list.append(m)
+
+    return render_template("album.html", album=item, media=media_list)
 
 
 @app.get("/media/<int:media_id>")
@@ -245,7 +251,6 @@ def media_view(media_id):
     if not media or not can_view(media):
         abort(404)
 
-    # Navegação Próximo / Anterior dentro do mesmo álbum
     album_media = [m for m in media.album.media.order_by(Media.created_at.desc()).all() if can_view(m)]
     current_index = next((i for i, m in enumerate(album_media) if m.id == media.id), None)
     
@@ -321,16 +326,30 @@ def toggle_favorite(media_id):
 @approved_required
 def favorites():
     items = Favorite.query.filter_by(user_id=current_user.id).order_by(Favorite.created_at.desc()).all()
-    media = [x.media for x in items if can_view(x.media)]
-    return render_template("collection.html", title="Favoritos", media=media)
+    media_list = []
+    for x in items:
+        if can_view(x.media):
+            m = x.media
+            m.views_cnt = View.query.filter_by(media_id=m.id).count()
+            m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
+            m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
+            media_list.append(m)
+    return render_template("collection.html", title="Favoritos", media=media_list)
 
 
 @app.get("/likes")
 @approved_required
 def likes():
     items = Like.query.filter_by(user_id=current_user.id).order_by(Like.created_at.desc()).all()
-    media = [x.media for x in items if can_view(x.media)]
-    return render_template("collection.html", title="Curtidas", media=media)
+    media_list = []
+    for x in items:
+        if can_view(x.media):
+            m = x.media
+            m.views_cnt = View.query.filter_by(media_id=m.id).count()
+            m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
+            m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
+            media_list.append(m)
+    return render_template("collection.html", title="Curtidas", media=media_list)
 
 
 @app.get("/media/<int:media_id>/stream")
@@ -344,12 +363,10 @@ def stream_media(media_id):
         service = drive.client()
         request_drive = service.files().get_media(fileId=media.drive_file_id)
 
-        # Para imagens pequenas, entrega direto da temp
         if media.mime_type and media.mime_type.startswith("image/"):
             path = drive.download_to_temp(media.drive_file_id)
             return send_file(path, mimetype=media.mime_type, conditional=True, etag=True)
 
-        # Streaming em tempo real sem gravar no disco para vídeos
         def generate():
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request_drive, chunksize=1024 * 1024)
