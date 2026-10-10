@@ -16,7 +16,8 @@ from models import db, User, Media, Album, Like, Favorite, View, AuditLog, SiteS
 from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
 
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+if os.environ.get("FLASK_ENV") == "development":
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 load_dotenv()
 
@@ -56,7 +57,7 @@ with app.app_context():
                 name="Administrador",
                 status="APPROVED",
                 access_level="ADMIN",
-                password_hash=generate_password_hash(os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "troque-esta-senha")),
+                password_hash=generate_password_hash(os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "Met@llica99P@ntera77")),
             )
             db.session.add(admin)
             db.session.commit()
