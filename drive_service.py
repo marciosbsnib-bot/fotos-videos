@@ -34,7 +34,7 @@ class DriveService:
         if not self.key:
             raise DriveConfigError("Configure TOKEN_ENCRYPTION_KEY para proteger o token do Drive.")
 
-        # Força HTTPS na redirect_uri apenas se estiver rodando em produção (Render), mantendo HTTP no localhost
+        # Força HTTPS na redirect_uri apenas em ambiente remoto (ex: Render), mantendo HTTP no localhost
         if self.redirect_uri and self.redirect_uri.startswith("http://") and "localhost" not in self.redirect_uri:
             self.redirect_uri = self.redirect_uri.replace("http://", "https://", 1)
 
@@ -55,6 +55,7 @@ class DriveService:
             client_config,
             scopes=SCOPES,
             state=state,
+            autogenerate_code_verifier=False,
         )
         flow.redirect_uri = self.redirect_uri
         return flow
@@ -70,7 +71,7 @@ class DriveService:
         return url, state
 
     def handle_callback(self, authorization_response, state):
-        # Garante que a URL tratada no callback seja HTTPS apenas fora do ambiente local
+        # Garante que a URL tratada no callback seja HTTPS fora do ambiente local
         if authorization_response.startswith("http://") and "localhost" not in authorization_response:
             authorization_response = authorization_response.replace("http://", "https://", 1)
 
