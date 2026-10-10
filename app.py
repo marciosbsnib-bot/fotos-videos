@@ -14,14 +14,12 @@ from models import db, User, Media, Album, Like, Favorite, View, AuditLog, SiteS
 from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
 
-# Permite que a biblioteca aceite o cabeçalho HTTPS vindo do Proxy do Render
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Correção completa de Proxy do Render para repassar proto, host e port
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-me")
@@ -244,6 +242,13 @@ def media_view(media_id):
     if not media or not can_view(media):
         abort(404)
 
+    # Navegação Próximo / Anterior dentro do mesmo álbum
+    album_media = [m for m in media.album.media.order_by(Media.created_at.desc()).all() if can_view(m)]
+    current_index = next((i for i, m in enumerate(album_media) if m.id == media.id), None)
+    
+    prev_media_id = album_media[current_index - 1].id if current_index is not None and current_index > 0 else None
+    next_media_id = album_media[current_index + 1].id if current_index is not None and current_index < len(album_media) - 1 else None
+
     now = datetime.now(timezone.utc)
     cooldown = int(os.environ.get("VIEW_COOLDOWN_MINUTES", "30"))
     last = View.query.filter_by(user_id=current_user.id, media_id=media.id).order_by(View.viewed_at.desc()).first()
@@ -268,6 +273,8 @@ def media_view(media_id):
         view_count=view_count,
         like_count=like_count,
         favorite_count=favorite_count,
+        prev_media_id=prev_media_id,
+        next_media_id=next_media_id,
     )
 
 
@@ -410,6 +417,28 @@ def admin_block_user(user_id):
     return redirect(url_for("admin_users"))
 
 
+@app.post("/admin/users/<int:user_id>/delete")
+@admin_required
+def admin_delete_user(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        abort(404)
+    if user.id == current_user.id:
+        flash("Você não pode deletar sua própria conta.", "error")
+        return redirect(url_for("admin_users"))
+    
+    # Remove associações de interações
+    Like.query.filter_by(user_id=user.id).delete()
+    Favorite.query.filter_by(user_id=user.id).delete()
+    View.query.filter_by(user_id=user.id).delete()
+    AuditLog.query.filter_by(user_id=user.id).delete()
+
+    db.session.delete(user)
+    db.session.commit()
+    flash("Usuário deletado com sucesso.", "success")
+    return redirect(url_for("admin_users"))
+
+
 @app.get("/admin/albums")
 @admin_required
 def admin_albums():
@@ -426,6 +455,36 @@ def admin_create_album():
         abort(400)
     db.session.add(Album(name=name, access_classification=classification))
     db.session.commit()
+    return redirect(url_for("admin_albums"))
+
+
+@app.post("/admin/albums/<int:album_id>/rename")
+@admin_required
+def admin_rename_album(album_id):
+    album = db.session.get(Album, album_id)
+    if not album:
+        abort(404)
+    new_name = request.form.get("name", "").strip()
+    if not new_name:
+        flash("Nome do álbum não pode ser vazio.", "error")
+        return redirect(url_for("admin_albums"))
+    album.name = new_name
+    db.session.commit()
+    audit("RENAME_ALBUM", details={"album_id": album.id, "new_name": new_name})
+    flash("Álbum renomeado.", "success")
+    return redirect(url_for("admin_albums"))
+
+
+@app.post("/admin/albums/<int:album_id>/delete")
+@admin_required
+def admin_delete_album(album_id):
+    album = db.session.get(Album, album_id)
+    if not album:
+        abort(404)
+    db.session.delete(album)
+    db.session.commit()
+    audit("DELETE_ALBUM", details={"album_id": album_id})
+    flash("Álbum deletado do site com sucesso.", "success")
     return redirect(url_for("admin_albums"))
 
 
@@ -532,13 +591,21 @@ def admin_drive_sync():
                 continue
             media = Media.query.filter_by(drive_file_id=f["id"]).first()
             if not media:
-                media = Media(album_id=album.id, drive_file_id=f["id"], name=f.get("name", "Sem nome"), mime_type=mime, access_classification=classification)
+                media = Media(
+                    album_id=album.id,
+                    drive_file_id=f["id"],
+                    name=f.get("name", "Sem nome"),
+                    mime_type=mime,
+                    thumbnail_url=f.get("thumbnailLink"),
+                    access_classification=classification
+                )
                 db.session.add(media)
                 count += 1
             else:
                 media.album_id = album.id
                 media.name = f.get("name", media.name)
                 media.mime_type = mime
+                media.thumbnail_url = f.get("thumbnailLink", media.thumbnail_url)
                 media.access_classification = classification
         db.session.commit()
         audit("DRIVE_SYNC", details={"folder_id": folder_id, "files_added": count})
