@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ title or "Meu Espaço" }}</title>
+  <title>{{ title or "Fotos&Vídeos" }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
@@ -17,7 +17,7 @@
       <a href="{{ url_for('likes') }}">♡ Curtidas</a>
     </nav>
     {% if current_user.access_level == "ADMIN" %}
-    <div class="nav-title">ADMINISTRAÇÃO</div>
+    <div class="nav-title">ADMINISTRAÇÃO </div>
     <nav>
       <a href="{{ url_for('admin_dashboard') }}">▦ Painel Admin</a>
       <a href="{{ url_for('admin_users') }}">♙ Usuários</a>

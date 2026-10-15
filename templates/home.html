@@ -1,20 +1,92 @@
-{% extends "base.html" %}
-{% block content %}
-<header class="topbar">
-  <div><h1>Álbuns</h1></div>
-  <div class="user-pill">{{ current_user.name }}</div>
-</header>
-<section class="album-grid">
-{% for album in albums %}
-  <a class="album-card" href="{{ url_for('album', album_id=album.id) }}">
-    <div class="album-cover">{{ album.name[:1]|upper }}</div>
-    <div class="album-info">
-      <h3>{{ album.name }}</h3>
-      <span class="badge {{ album.access_classification|lower }}">{{ album.access_classification }}</span>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Álbuns</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+    <div class="app">
+        <!-- BARRA LATERAL -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">M</div>
+                <span>Fotos & Vídeos</span>
+            </div>
+
+            <nav>
+                <a href="{{ url_for('index') }}">Álbuns</a>
+                <a href="{{ url_for('favorites') }}">Favoritos</a>
+                <a href="{{ url_for('likes') }}">Curtidas</a>
+                {% if current_user.access_level == 'ADMIN' %}
+                    <div class="nav-title">ADMINISTRAÇÃO</div>
+                    <a href="{{ url_for('admin_dashboard') }}">Painel Admin</a>
+                    <a href="{{ url_for('admin_users') }}">Usuários</a>
+                    <a href="{{ url_for('admin_albums') }}">Gerenciar Álbuns</a>
+                    <a href="{{ url_for('admin_drive') }}">Google Drive</a>
+                    <a href="{{ url_for('admin_settings') }}">Configurações</a>
+                    <a href="{{ url_for('admin_logs') }}">Logs de Auditoria</a>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-bottom">
+                <span>{{ current_user.name }}</span>
+                <a href="{{ url_for('logout') }}">Sair</a>
+            </div>
+        </aside>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <h1>Álbuns</h1>
+                    <p class="muted">Selecione um álbum para visualizar as mídias</p>
+                </div>
+                <div class="user-pill">
+                    {{ current_user.email }} ({{ current_user.access_level }})
+                </div>
+            </header>
+
+            <!-- GRID DE ÁLBUNS -->
+            <section class="album-grid">
+                {% for album in albums %}
+                    {% set covers = album.cover_medias %}
+                    {% set count = covers|length %}
+
+                    <div class="album-card">
+                        <a href="{{ url_for('album', album_id=album.id) }}" class="album-cover count-{{ count }} {% if count == 0 %}empty{% endif %}">
+                            {% if count > 0 %}
+                                {% for item in covers %}
+                                    <img 
+                                        src="{{ url_for('stream_media', media_id=item.id) }}" 
+                                        alt="{{ item.name }}" 
+                                        class="cover-item"
+                                        loading="lazy"
+                                        referrerpolicy="no-referrer"
+                                    >
+                                {% endfor %}
+                            {% else %}
+                                <span>Sem mídias</span>
+                            {% endif %}
+                        </a>
+
+                        <div class="album-info">
+                            <h3>
+                                <a href="{{ url_for('album', album_id=album.id) }}">{{ album.name }}</a>
+                            </h3>
+                            <span class="badge {{ album.access_classification|lower }}">
+                                {{ album.access_classification }}
+                            </span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty">
+                        <p>Nenhum álbum disponível no momento.</p>
+                    </div>
+                {% endfor %}
+            </section>
+        </main>
     </div>
-  </a>
-{% else %}
-  <div class="empty">Nenhum álbum disponível ainda.</div>
-{% endfor %}
-</section>
-{% endblock %}
+</body>
+</html>

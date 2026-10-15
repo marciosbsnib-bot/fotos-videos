@@ -43,6 +43,11 @@ class Album(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
     media = db.relationship("Media", backref="album", lazy="dynamic", cascade="all, delete-orphan")
 
+    @property
+    def cover_medias(self):
+        """Retorna até 3 mídias recentes para compor a capa estilo mosaico."""
+        return self.media.order_by(Media.created_at.desc()).limit(3).all()
+
 
 class Media(db.Model):
     id = db.Column(db.Integer, primary_key=True)
