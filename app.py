@@ -1,5 +1,6 @@
 import io
 import os
+
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlparse
@@ -15,6 +16,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, User, Media, Album, Like, Favorite, View, AuditLog, SiteSetting
 from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
+
+from cloudinary_service import CloudinaryService
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -239,6 +242,13 @@ def album(album_id):
             m.views_cnt = View.query.filter_by(media_id=m.id).count()
             m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
             m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
+
+            # CORREÇÃO DINÂMICA: Se for vídeo do Cloudinary, força a extensão .jpg na URL da capa
+            if m.cloudinary_public_id and m.mime_type and m.mime_type.startswith("video/"):
+                if m.thumbnail_url and not m.thumbnail_url.endswith(".jpg"):
+                    base_url = m.thumbnail_url.rsplit('.', 1)[0]
+                    m.thumbnail_url = f"{base_url}.jpg"
+
             media_list.append(m)
 
     return render_template("album.html", album=item, media=media_list)
@@ -356,8 +366,17 @@ def likes():
 @approved_required
 def stream_media(media_id):
     media = db.session.get(Media, media_id)
-    if not media or not can_view(media) or not media.drive_file_id:
+    if not media or not can_view(media):
         abort(404)
+
+    # Suporte ao Cloudinary (redireciona para URL direta da CDN)
+    if hasattr(media, 'cloudinary_public_id') and media.cloudinary_public_id and media.thumbnail_url:
+        return redirect(media.thumbnail_url)
+
+    # Suporte ao Google Drive
+    if not media.drive_file_id:
+        abort(404)
+        
     try:
         drive = DriveService()
         service = drive.client()
@@ -398,7 +417,7 @@ def admin_delete_media(media_id):
 
     audit("DELETE_MEDIA", media_id=media.id, details={"name": media.name, "album_id": media.album_id})
 
-    # Remove os registos vinculados
+    # Remove os registros vinculados
     Like.query.filter_by(media_id=media.id).delete()
     Favorite.query.filter_by(media_id=media.id).delete()
     View.query.filter_by(media_id=media.id).delete()
@@ -412,6 +431,7 @@ def admin_delete_media(media_id):
 
     flash("Mídia excluída com sucesso.", "success")
     return redirect(request.referrer or url_for("album", album_id=media.album_id))
+
 
 @app.get("/admin")
 @admin_required
@@ -621,6 +641,89 @@ def admin_logs():
     return render_template("admin/logs.html", logs=logs)
 
 
+# ---------------- CLOUDINARY ----------------
+
+@app.get("/admin/cloudinary")
+@admin_required
+def admin_cloudinary():
+    connected = bool(os.getenv("CLOUDINARY_CLOUD_NAME"))
+    return render_template("admin/cloudinary.html", connected=connected)
+
+
+@app.post("/admin/cloudinary/sync")
+@admin_required
+def admin_cloudinary_sync():
+    prefix = request.form.get("prefix", "").strip()
+    album_name = request.form.get("album_name", "").strip()
+    classification = request.form.get("classification", "PUBLIC")
+
+    if not album_name:
+        if prefix:
+            album_name = prefix.strip("/").split("/")[-1].capitalize()
+        else:
+            flash("Informe o Nome do Álbum ou informe uma Pasta / Prefixo.", "error")
+            return redirect(url_for("admin_cloudinary"))
+
+    if classification not in {"PUBLIC", "NORMAL", "RESTRICTED"}:
+        flash("Classificação inválida.", "error")
+        return redirect(url_for("admin_cloudinary"))
+
+    try:
+        service = CloudinaryService()
+        resources = service.list_folder_or_prefix(prefix)
+
+        if not resources:
+            flash(f"Nenhum arquivo encontrado no Cloudinary para o prefixo '{prefix}'.", "error")
+            return redirect(url_for("admin_cloudinary"))
+
+        album = Album.query.filter_by(name=album_name).first()
+        if not album:
+            album = Album(name=album_name, access_classification=classification)
+            db.session.add(album)
+            db.session.flush()
+
+        count = 0
+        for res in resources:
+            public_id = res.get("public_id")
+            media = Media.query.filter_by(cloudinary_public_id=public_id).first()
+            
+            resource_type = res.get('resource_type', 'image')
+            format_ext = res.get('format', 'jpg')
+            mime_type = f"{resource_type}/{format_ext}"
+            secure_url = res.get("secure_url", "")
+
+            # Força o link de capa a ser .jpg para vídeos
+            thumbnail_url = secure_url
+            if resource_type == "video" and secure_url:
+                base_url = secure_url.rsplit('.', 1)[0] if '.' in secure_url else secure_url
+                thumbnail_url = f"{base_url}.jpg"
+
+            if not media:
+                media = Media(
+                    album_id=album.id,
+                    cloudinary_public_id=public_id,
+                    name=public_id,
+                    mime_type=mime_type,
+                    thumbnail_url=thumbnail_url,
+                    access_classification=classification
+                )
+                db.session.add(media)
+                count += 1
+            else:
+                media.thumbnail_url = thumbnail_url
+                media.mime_type = mime_type
+
+        db.session.commit()
+        audit("CLOUDINARY_SYNC", details={"prefix": prefix, "album_name": album_name, "files_added": count})
+        flash(f"Sincronização concluída! Álbum '{album_name}': {count} mídias atualizadas.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(f"Falha ao sincronizar com Cloudinary: {exc}", "error")
+
+    return redirect(url_for("admin_cloudinary"))
+
+# ---------------- GOOGLE DRIVE ----------------
+
 @app.get("/admin/drive")
 @admin_required
 def admin_drive():
@@ -679,6 +782,11 @@ def admin_drive_sync():
             mime = f.get("mimeType", "")
             if not (mime.startswith("image/") or mime.startswith("video/")):
                 continue
+            
+            # Garante que a thumb do Drive venha em alta resolução
+            raw_thumb = f.get("thumbnailLink")
+            thumb_url = raw_thumb.rsplit('=', 1)[0] + '=w800' if raw_thumb else None
+
             media = Media.query.filter_by(drive_file_id=f["id"]).first()
             if not media:
                 media = Media(
@@ -686,7 +794,7 @@ def admin_drive_sync():
                     drive_file_id=f["id"],
                     name=f.get("name", "Sem nome"),
                     mime_type=mime,
-                    thumbnail_url=f.get("thumbnailLink"),
+                    thumbnail_url=thumb_url,
                     access_classification=classification
                 )
                 db.session.add(media)
@@ -695,7 +803,7 @@ def admin_drive_sync():
                 media.album_id = album.id
                 media.name = f.get("name", media.name)
                 media.mime_type = mime
-                media.thumbnail_url = f.get("thumbnailLink", media.thumbnail_url)
+                media.thumbnail_url = thumb_url or media.thumbnail_url
                 media.access_classification = classification
         db.session.commit()
         audit("DRIVE_SYNC", details={"folder_id": folder_id, "files_added": count})
@@ -704,7 +812,6 @@ def admin_drive_sync():
         db.session.rollback()
         flash(f"Falha ao sincronizar o Drive: {exc}", "error")
     return redirect(url_for("admin_drive"))
-
 
 @app.errorhandler(403)
 def forbidden(_):

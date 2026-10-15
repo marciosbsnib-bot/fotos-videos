@@ -12,3 +12,4 @@ google-auth-oauthlib>=1.2,<2
 google-auth-httplib2>=0.2,<1
 requests>=2.32,<3
 gunicorn>=23.0,<24
+cloudinary>=1.41.0,<2

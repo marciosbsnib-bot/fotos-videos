@@ -229,7 +229,7 @@ a {
 }
 
 .album-cover.count-3 .cover-item:nth-child(3) {
-  right: 0;
+  right: -2;
   width: 40%;
   clip-path: polygon(32% 0, 100% 0, 100% 100%, 0 100%);
   z-index: 1;
@@ -828,4 +828,54 @@ th {
   background-color: rgba(88, 166, 255, 0.15);
   border-color: #58a6ff;
   color: #58a6ff;
+}
+
+/* Container de mídia com suporte ao indicador de vídeo */
+.media-card-link {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Ícone de Play / Badge indicando Vídeo */
+.video-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.video-play-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  pointer-events: none;
+  z-index: 5;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.media-card:hover .video-play-overlay {
+  background: rgba(88, 166, 255, 0.9);
+  transform: translate(-50%, -50%) scale(1.1);
 }

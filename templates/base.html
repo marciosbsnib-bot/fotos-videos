@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <!-- Meta tag CSRF necessária para as requisições AJAX do app.js -->
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>{{ title or "Meu Espaço" }}</title>
+  <title>{{ title or "Fotos&Vídeos" }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
 <div class="app">
   {% if current_user.is_authenticated and current_user.status == "APPROVED" %}
   <aside class="sidebar" id="sidebar">
-    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">M</span> Meu Espaço</a>
+    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">M</span> Fotos&Vídeos</a>
     <nav>
       <a href="{{ url_for('index') }}">⌂ Início</a>
       <a href="{{ url_for('favorites') }}">♡ Favoritos</a>
@@ -30,7 +30,9 @@
       <a href="{{ url_for('admin_albums') }}">▣ Álbuns</a>
       <a href="{{ url_for('admin_logs') }}">≡ Logs</a>
       <a href="{{ url_for('admin_settings') }}">⚙ Configurações</a>
-      <a href="{{ url_for('admin_drive') }}">☁ Google Drive</a>
+      <!-- Cloudinary posicionado acima do Google Drive -->
+      <a href="{{ url_for('admin_cloudinary') }}">☁️ Cloudinary</a>
+      <a href="{{ url_for('admin_drive') }}">🤖 Google Drive</a>
     </nav>
     {% endif %}
     <div class="sidebar-bottom">

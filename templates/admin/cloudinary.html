@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Integração Cloudinary{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+  <h1>☁️ Integração Cloudinary</h1>
+
+  {% if connected %}
+    <p style="color: #3fb950;">✔️ Cloudinary configurado nas variáveis de ambiente.</p>
+    
+    <form action="{{ url_for('admin_cloudinary_sync') }}" method="POST" style="margin-top: 20px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div style="margin-bottom: 15px;">
+        <label>Nome do Álbum (Opcional se informar a pasta):</label><br>
+        <input type="text" name="album_name" placeholder="Ex: Viagem 2026 (deixe vazio p/ usar nome da pasta)" style="width: 380px; padding: 8px; border-radius: 6px; background: #21262d; border: 1px solid #30363d; color: #fff;">
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <label>Pasta / Prefixo (Opcional se informar o nome do álbum):</label><br>
+        <input type="text" name="prefix" placeholder="Ex: Teste" style="width: 380px; padding: 8px; border-radius: 6px; background: #21262d; border: 1px solid #30363d; color: #fff;">
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <label>Classificação Inicial:</label><br>
+        <select name="classification" style="padding: 8px; border-radius: 6px; background: #21262d; border: 1px solid #30363d; color: #fff;">
+          <option value="PUBLIC">Público</option>
+          <option value="NORMAL">Normal</option>
+          <option value="RESTRICTED">Restrito</option>
+        </select>
+      </div>
+
+      <button type="submit" class="ctrl-btn">🔄 Sincronizar Mídias do Cloudinary</button>
+    </form>
+  {% else %}
+    <p style="color: #f85149;">❌ As credenciais do Cloudinary não foram encontradas no arquivo .env.</p>
+  {% endif %}
+</div>
+{% endblock %}

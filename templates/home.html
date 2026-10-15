@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> Álbuns</title>
+    <title>Álbuns</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
     <div class="app">
         <!-- BARRA LATERAL -->
-        <aside class="sidebar" >
+        <aside class="sidebar">
             <div class="brand">
                 <div class="brand-mark">M</div>
                 <span>Fotos & Vídeos</span>
@@ -23,6 +23,7 @@
                     <a href="{{ url_for('admin_dashboard') }}">Painel Admin</a>
                     <a href="{{ url_for('admin_users') }}">Usuários</a>
                     <a href="{{ url_for('admin_albums') }}">Gerenciar Álbuns</a>
+                    <a href="{{ url_for('admin_cloudinary') }}">Cloudinary</a>
                     <a href="{{ url_for('admin_drive') }}">Google Drive</a>
                     <a href="{{ url_for('admin_settings') }}">Configurações</a>
                     <a href="{{ url_for('admin_logs') }}">Logs de Auditoria</a>
@@ -50,15 +51,22 @@
             <!-- GRID DE ÁLBUNS -->
             <section class="album-grid">
                 {% for album in albums %}
-                    {% set covers = album.cover_medias %}
-                    {% set count = covers|length %}
+                    <!-- Filtra cover_medias para pegar APENAS IMAGENS -->
+                    {% set image_covers = [] %}
+                    {% for item in album.cover_medias %}
+                        {% if item.mime_type and item.mime_type.startswith('image/') %}
+                            {% set _ = image_covers.append(item) %}
+                        {% endif %}
+                    {% endfor %}
 
-                    <div class="album-card">
+                    {% set count = image_covers|length %}
+
+                    <div class="album-card" style="position: relative;">
                         <a href="{{ url_for('album', album_id=album.id) }}" class="album-cover count-{{ count }} {% if count == 0 %}empty{% endif %}">
                             {% if count > 0 %}
-                                {% for item in covers %}
+                                {% for item in image_covers %}
                                     <img 
-                                        src="{{ url_for('stream_media', media_id=item.id) }}" 
+                                        src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" 
                                         alt="{{ item.name }}" 
                                         class="cover-item"
                                         loading="lazy"
@@ -70,13 +78,28 @@
                             {% endif %}
                         </a>
 
-                        <div class="album-info">
-                            <h3>
-                                <a href="{{ url_for('album', album_id=album.id) }}">{{ album.name }}</a>
-                            </h3>
-                            <span class="badge {{ album.access_classification|lower }}">
-                                {{ album.access_classification }}
-                            </span>
+                        <div class="album-info" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3>
+                                    <a href="{{ url_for('album', album_id=album.id) }}">{{ album.name }}</a>
+                                </h3>
+                                <span class="badge {{ album.access_classification|lower }}">
+                                    {{ album.access_classification }}
+                                </span>
+                            </div>
+
+                            <!-- Botão de Lixeira para Admin Excluir Álbum -->
+                            {% if current_user.access_level == 'ADMIN' %}
+                                <form action="{{ url_for('admin_delete_album', album_id=album.id) }}" 
+                                      method="POST" 
+                                      onsubmit="return confirm('Tem certeza que deseja excluir o álbum \'{{ album.name }}\'?');"
+                                      style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-delete" title="Excluir Álbum" style="background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                                        🗑️
+                                    </button>
+                                </form>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}

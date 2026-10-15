@@ -53,6 +53,7 @@ class Media(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     album_id = db.Column(db.Integer, db.ForeignKey("album.id"), nullable=False, index=True)
     drive_file_id = db.Column(db.String(255), unique=True)
+    cloudinary_public_id = db.Column(db.String(255), unique=True)
     name = db.Column(db.String(500), nullable=False)
     mime_type = db.Column(db.String(255))
     thumbnail_url = db.Column(db.Text)

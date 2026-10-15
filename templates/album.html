@@ -9,23 +9,53 @@
   <div class="gallery-grid">
     {% for item in media %}
       <div class="media-card" id="media-card-{{ item.id }}">
-        <a href="{{ url_for('media_view', media_id=item.id) }}">
-          <img class="media-preview" src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" alt="Mídia" loading="lazy">
+        
+        <a href="{{ url_for('media_view', media_id=item.id) }}" class="media-card-link">
+          {% if item.mime_type and item.mime_type.startswith('video/') %}
+            
+            <!-- Ícones sobrepostos indicando que é um Vídeo -->
+            <span class="video-badge">🎥 Vídeo</span>
+            <div class="video-play-overlay">▶</div>
+
+            {% if item.cloudinary_public_id and item.thumbnail_url %}
+              <!-- VÍDEO DO CLOUDINARY: usa imagem da capa estática .jpg -->
+              <img class="media-preview" 
+                   src="{{ item.thumbnail_url }}" 
+                   alt="Vídeo Cloudinary" 
+                   loading="lazy">
+            {% else %}
+              <!-- VÍDEO DO GOOGLE DRIVE: faz stream com o parâmetro #t=0.5 para carregar o 1º frame -->
+              <video class="media-preview" preload="metadata" muted playsinline>
+                <source src="{{ url_for('stream_media', media_id=item.id) }}#t=0.5" type="{{ item.mime_type or 'video/mp4' }}">
+              </video>
+            {% endif %}
+
+          {% else %}
+            <!-- FOTO (CLOUDINARY OU DRIVE) -->
+            <img class="media-preview" 
+                 src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" 
+                 alt="Foto" 
+                 loading="lazy"
+                 referrerpolicy="no-referrer">
+          {% endif %}
         </a>
+
         <div class="media-info">
           
+          <!-- ESTATÍSTICAS DA MÍDIA -->
           <div class="media-stats">
             {% if settings.show_views %}
               <span>👁️ {{ item.views_cnt }}</span>
             {% endif %}
             {% if settings.show_likes %}
-              <span>👍 {{ item.likes_cnt }}</span>
+              <span>🤘 {{ item.likes_cnt }}</span>
             {% endif %}
             {% if settings.show_favorites %}
               <span>❤️ {{ item.favs_cnt }}</span>
             {% endif %}
           </div>
 
+          <!-- AÇÕES DE PRIVACIDADE E EXCLUSÃO -->
           <div class="media-actions">
             {% if current_user.access_level == 'ADMIN' %}
               <select class="privacy-select" onchange="alterarPrivacidade({{ item.id }}, this.value)">
