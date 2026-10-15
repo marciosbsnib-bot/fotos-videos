@@ -18,6 +18,7 @@ from drive_service import DriveService, DriveConfigError
 from google_auth import init_google
 
 from cloudinary_service import CloudinaryService
+import cloudinary.utils
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -243,7 +244,8 @@ def album(album_id):
             m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
             m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
 
-            # CORREÇÃO DINÂMICA: Se for vídeo do Cloudinary, força a extensão .jpg na URL da capa
+            # CORREÇÃO: Mantém a regra do thumbnail .jpg apenas se for vídeo do Cloudinary,
+            # sem sobrescrever a URL principal do arquivo de mídia.
             if m.cloudinary_public_id and m.mime_type and m.mime_type.startswith("video/"):
                 if m.thumbnail_url and not m.thumbnail_url.endswith(".jpg"):
                     base_url = m.thumbnail_url.rsplit('.', 1)[0]
@@ -369,9 +371,15 @@ def stream_media(media_id):
     if not media or not can_view(media):
         abort(404)
 
-    # Suporte ao Cloudinary (redireciona para URL direta da CDN)
-    if hasattr(media, 'cloudinary_public_id') and media.cloudinary_public_id and media.thumbnail_url:
-        return redirect(media.thumbnail_url)
+    # CORREÇÃO PRINCIPAL: Suporte correto ao Cloudinary (Gera a URL de vídeo ou imagem correta via SDK/resource_type)
+    if hasattr(media, 'cloudinary_public_id') and media.cloudinary_public_id:
+        res_type = "video" if media.mime_type and media.mime_type.startswith("video/") else "image"
+        video_url, _ = cloudinary.utils.cloudinary_url(
+            media.cloudinary_public_id,
+            resource_type=res_type,
+            secure=True
+        )
+        return redirect(video_url)
 
     # Suporte ao Google Drive
     if not media.drive_file_id:
@@ -417,7 +425,6 @@ def admin_delete_media(media_id):
 
     audit("DELETE_MEDIA", media_id=media.id, details={"name": media.name, "album_id": media.album_id})
 
-    # Remove os registros vinculados
     Like.query.filter_by(media_id=media.id).delete()
     Favorite.query.filter_by(media_id=media.id).delete()
     View.query.filter_by(media_id=media.id).delete()
@@ -692,7 +699,7 @@ def admin_cloudinary_sync():
             mime_type = f"{resource_type}/{format_ext}"
             secure_url = res.get("secure_url", "")
 
-            # Força o link de capa a ser .jpg para vídeos
+            # Gera corretamente o link de capa (.jpg) apenas para a propriedade thumbnail_url
             thumbnail_url = secure_url
             if resource_type == "video" and secure_url:
                 base_url = secure_url.rsplit('.', 1)[0] if '.' in secure_url else secure_url
@@ -783,7 +790,6 @@ def admin_drive_sync():
             if not (mime.startswith("image/") or mime.startswith("video/")):
                 continue
             
-            # Garante que a thumb do Drive venha em alta resolução
             raw_thumb = f.get("thumbnailLink")
             thumb_url = raw_thumb.rsplit('=', 1)[0] + '=w800' if raw_thumb else None
 
