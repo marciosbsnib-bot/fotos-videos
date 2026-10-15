@@ -1,57 +1,52 @@
 {% extends "base.html" %}
+
+{% block title %}{{ album.name }} - Galeria{% endblock %}
+
 {% block content %}
-<header class="topbar">
-  <div><a class="back" href="{{ url_for('index') }}">← Álbuns</a><h1>{{ album.name }}</h1></div>
-  <span class="badge {{ album.access_classification|lower }}">{{ album.access_classification }}</span>
-</header>
+<div class="album-container">
+  <h1>{{ album.name }}</h1>
 
-<style>
-  .media-grid {
-    grid-template-columns: repeat(6, 1fr) !important;
-  }
-  @media(max-width: 1200px) { .media-grid { grid-template-columns: repeat(4, 1fr) !important; } }
-  @media(max-width: 800px) { .media-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-</style>
+  <div class="gallery-grid">
+    {% for item in media %}
+      <div class="media-card" id="media-card-{{ item.id }}">
+        <a href="{{ url_for('media_view', media_id=item.id) }}">
+          <img class="media-preview" src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" alt="Mídia" loading="lazy">
+        </a>
+        <div class="media-info">
+          
+          <div class="media-stats">
+            {% if settings.show_views %}
+              <span>👁️ {{ item.views_cnt }}</span>
+            {% endif %}
+            {% if settings.show_likes %}
+              <span>👍 {{ item.likes_cnt }}</span>
+            {% endif %}
+            {% if settings.show_favorites %}
+              <span>❤️ {{ item.favs_cnt }}</span>
+            {% endif %}
+          </div>
 
-<div class="media-grid">
-{% for item in media %}
-  <div class="media-card-wrapper" style="background: #1e1e1e; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;">
-    <a class="media-card" href="{{ url_for('media_view', media_id=item.id) }}" style="text-decoration: none; color: inherit;">
-      <div class="thumb" style="overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; background: #181818; aspect-ratio: 16/9;">
-        {% if item.thumbnail_url %}
-          <img src="{{ item.thumbnail_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;" referrerpolicy="no-referrer">
-        {% elif item.mime_type and item.mime_type.startswith("video/") %}
-          <video src="{{ url_for('stream_media', media_id=item.id) }}#t=0.5" preload="metadata" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none;"></video>
-        {% else %}
-          <img src="{{ url_for('stream_media', media_id=item.id) }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-        {% endif %}
+          <div class="media-actions">
+            {% if current_user.access_level == 'ADMIN' %}
+              <select class="privacy-select" onchange="alterarPrivacidade({{ item.id }}, this.value)">
+                <option value="PUBLIC" {% if item.access_classification == 'PUBLIC' %}selected{% endif %}>Público</option>
+                <option value="NORMAL" {% if item.access_classification == 'NORMAL' %}selected{% endif %}>Normal</option>
+                <option value="RESTRICTED" {% if item.access_classification == 'RESTRICTED' %}selected{% endif %}>Restrito</option>
+              </select>
 
-        {% if item.mime_type and item.mime_type.startswith("video/") %}
-          <span style="position: absolute; color: white; font-size: 1.5rem; text-shadow: 0 0 8px rgba(0,0,0,0.8); background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 50%;">▶</span>
-        {% endif %}
+              <button type="button" class="btn-delete" onclick="eliminarMedia({{ item.id }})" title="Excluir foto/vídeo">
+                🗑️
+              </button>
+            {% else %}
+              <select class="privacy-select" disabled>
+                <option>{% if item.access_classification == 'PUBLIC' %}Público{% elif item.access_classification == 'NORMAL' %}Normal{% else %}Restrito{% endif %}</option>
+              </select>
+            {% endif %}
+          </div>
+
+        </div>
       </div>
-      <div class="media-name" style="margin: 6px 8px 0 8px; font-weight: 500; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.name }}">{{ item.name }}</div>
-      <div class="media-stats" style="font-size: 0.75rem; color: #aaa; display: flex; gap: 8px; margin: 4px 8px;">
-        {% if settings.show_views %}<span>👁 {{ item.views_cnt|default(0) }}</span>{% endif %}
-        {% if settings.show_likes %}<span>👍 {{ item.likes_cnt|default(0) }}</span>{% endif %}
-        {% if settings.show_favorites %}<span>❤️ {{ item.favs_cnt|default(0) }}</span>{% endif %}
-      </div>
-    </a>
-
-    {% if current_user.is_authenticated and current_user.access_level == "ADMIN" %}
-    <form method="post" action="{{ url_for('admin_media_classification', media_id=item.id) }}" style="padding: 6px 8px; background: #252525; display: flex; gap: 4px; align-items: center;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <select name="classification" style="font-size: 0.7rem; width: 100%; padding: 2px;">
-        <option value="PUBLIC" {% if item.access_classification=="PUBLIC" %}selected{% endif %}>Público</option>
-        <option value="NORMAL" {% if item.access_classification=="NORMAL" %}selected{% endif %}>Normal</option>
-        <option value="RESTRICTED" {% if item.access_classification=="RESTRICTED" %}selected{% endif %}>Restrito</option>
-      </select>
-      <button class="small secondary" style="font-size: 0.7rem; padding: 2px 6px;">OK</button>
-    </form>
-    {% endif %}
+    {% endfor %}
   </div>
-{% else %}
-  <div class="empty">Nenhuma mídia neste álbum.</div>
-{% endfor %}
 </div>
 {% endblock %}

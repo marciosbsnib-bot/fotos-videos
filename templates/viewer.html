@@ -1,68 +1,82 @@
 {% extends "base.html" %}
+
+{% block title %}Visualizador de Mídia{% endblock %}
+
 {% block content %}
-<div class="viewer">
-  <header class="viewer-top">
-    <a href="{{ url_for('album', album_id=media.album_id) }}">← {{ media.album.name }}</a>
-    <span>{{ media.name }}</span>
-    <a href="{{ url_for('index') }}">×</a>
-  </header>
+<div class="viewer-container">
   
-  <div class="viewer-stage" style="position: relative;">
+  <div class="viewer-media-wrapper">
     {% if prev_media_id %}
-      <a href="{{ url_for('media_view', media_id=prev_media_id) }}" class="nav-btn prev-btn" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(0,0,0,0.6); color: white; padding: 12px 16px; text-decoration: none; border-radius: 50%; font-weight: bold; font-size: 1.2rem;">❮</a>
+      <a href="{{ url_for('media_view', media_id=prev_media_id) }}" class="nav-arrow prev-arrow" title="Anterior">❮</a>
     {% endif %}
 
-    {% if media.mime_type and media.mime_type.startswith("video/") %}
-      <video controls playsinline class="video" src="{{ url_for('stream_media', media_id=media.id) }}"></video>
+    {% if media.mime_type and media.mime_type.startswith('video/') %}
+      <video id="mediaElement" controls autoplay class="viewer-media">
+        <source src="{{ url_for('stream_media', media_id=media.id) }}" type="{{ media.mime_type }}">
+        Seu navegador não suporta a exibição deste vídeo.
+      </video>
     {% else %}
-      <img id="photo" class="photo" src="{{ url_for('stream_media', media_id=media.id) }}" alt="{{ media.name }}">
+      <img id="mediaElement" src="{{ url_for('stream_media', media_id=media.id) }}" alt="Mídia" class="viewer-media">
     {% endif %}
 
     {% if next_media_id %}
-      <a href="{{ url_for('media_view', media_id=next_media_id) }}" class="nav-btn next-btn" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(0,0,0,0.6); color: white; padding: 12px 16px; text-decoration: none; border-radius: 50%; font-weight: bold; font-size: 1.2rem;">❯</a>
+      <a href="{{ url_for('media_view', media_id=next_media_id) }}" class="nav-arrow next-arrow" title="Próximo">❯</a>
     {% endif %}
   </div>
 
-  <div class="viewer-controls" style="flex-wrap: wrap; justify-content: center; gap: 10px;">
-    {% if prev_media_id %}
-      <a class="icon-btn" href="{{ url_for('media_view', media_id=prev_media_id) }}">❮ Anterior</a>
-    {% endif %}
-
-    {% if settings.show_views %}<span>👁 {{ view_count }}</span>{% endif %}
-    {% if settings.show_likes %}<span>👍 {{ like_count }}</span>{% endif %}
-    {% if settings.show_favorites %}<span>❤️ {{ favorite_count }}</span>{% endif %}
+  <div class="viewer-toolbar">
     
-    <form method="post" action="{{ url_for('toggle_like', media_id=media.id) }}" style="display:inline;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button class="icon-btn {% if liked %}active{% endif %}">👍 {{ "Curtido" if liked else "Curtir" }}</button>
-    </form>
-    <form method="post" action="{{ url_for('toggle_favorite', media_id=media.id) }}" style="display:inline;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button class="icon-btn {% if favorite %}active-heart{% endif %}">♥ {{ "Favorito" if favorite else "Favoritar" }}</button>
-    </form>
+    <!-- ESQUERDA: Contadores Clicáveis (Curtir e Favoritar com ícone Heavy Metal) -->
+    <div class="viewer-stats-group">
+      {% if settings.show_views %}
+        <span class="stat-badge" title="Visualizações">👁️ {{ view_count }}</span>
+      {% endif %}
 
-    {% if not media.mime_type or not media.mime_type.startswith("video/") %}
-      <button class="icon-btn" onclick="toggleFullscreen()">⛶ Tela cheia</button>
-      <button class="icon-btn" onclick="zoomPhoto(1.2)">＋ Zoom</button>
-      <button class="icon-btn" onclick="zoomPhoto(.83)">− Zoom</button>
-    {% endif %}
+      {% if settings.show_likes %}
+        <form action="{{ url_for('toggle_like', media_id=media.id) }}" method="POST" style="display: inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="stat-btn {% if liked %}active{% endif %}" title="Curtir">
+            🤘 {{ like_count }}
+          </button>
+        </form>
+      {% endif %}
 
-    {% if next_media_id %}
-      <a class="icon-btn" href="{{ url_for('media_view', media_id=next_media_id) }}">Próximo ❯</a>
-    {% endif %}
+      {% if settings.show_favorites %}
+        <form action="{{ url_for('toggle_favorite', media_id=media.id) }}" method="POST" style="display: inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="stat-btn {% if favorite %}active{% endif %}" title="Favoritar">
+            ❤️ {{ favorite_count }}
+          </button>
+        </form>
+      {% endif %}
+    </div>
 
-    {% if current_user.is_authenticated and current_user.access_level == "ADMIN" %}
-      <form method="post" action="{{ url_for('admin_media_classification', media_id=media.id) }}" style="display: inline-flex; gap: 5px; align-items: center; margin-left: 10px; background: #222; padding: 4px 8px; border-radius: 4px;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <span style="font-size: 0.8rem; color: #ccc;">Acesso:</span>
-        <select name="classification" style="font-size: 0.8rem; padding: 2px;">
-          <option value="PUBLIC" {% if media.access_classification=="PUBLIC" %}selected{% endif %}>Público</option>
-          <option value="NORMAL" {% if media.access_classification=="NORMAL" %}selected{% endif %}>Normal</option>
-          <option value="RESTRICTED" {% if media.access_classification=="RESTRICTED" %}selected{% endif %}>Restrito</option>
+    <!-- CENTRO: Controles de Exibição -->
+    <div class="viewer-controls-group">
+      <button type="button" class="ctrl-btn" onclick="toggleFullscreen()">⛶ Tela cheia</button>
+      <button type="button" class="ctrl-btn" onclick="zoomIn()">+ Zoom</button>
+      <button type="button" class="ctrl-btn" onclick="zoomOut()">- Zoom</button>
+      {% if next_media_id %}
+        <a href="{{ url_for('media_view', media_id=next_media_id) }}" class="ctrl-btn">Próximo ❯</a>
+      {% endif %}
+    </div>
+
+    <!-- DIREITA: Ações de Admin (Sem rótulo/botão OK + Lixeira de Excluir) -->
+    <div class="viewer-actions-group">
+      {% if current_user.access_level == 'ADMIN' %}
+        <select class="privacy-select" onchange="alterarPrivacidade({{ media.id }}, this.value)">
+          <option value="PUBLIC" {% if media.access_classification == 'PUBLIC' %}selected{% endif %}>Público</option>
+          <option value="NORMAL" {% if media.access_classification == 'NORMAL' %}selected{% endif %}>Normal</option>
+          <option value="RESTRICTED" {% if media.access_classification == 'RESTRICTED' %}selected{% endif %}>Restrito</option>
         </select>
-        <button class="small secondary" style="font-size: 0.75rem; padding: 2px 6px;">Alterar</button>
-      </form>
-    {% endif %}
+
+        <button type="button" class="btn-delete" onclick="eliminarMediaEVoltar({{ media.id }}, {{ media.album_id }})" title="Excluir foto/vídeo">
+          🗑️
+        </button>
+      {% endif %}
+    </div>
+
   </div>
+
 </div>
 {% endblock %}

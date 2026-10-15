@@ -3,19 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ title or "Fotos&Vídeos" }}</title>
+  <!-- Meta tag CSRF necessária para as requisições AJAX do app.js -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{{ title or "Meu Espaço" }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
 <div class="app">
   {% if current_user.is_authenticated and current_user.status == "APPROVED" %}
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">M</span> Meu Espaço</a>
     <nav>
       <a href="{{ url_for('index') }}">⌂ Início</a>
       <a href="{{ url_for('favorites') }}">♡ Favoritos</a>
       <a href="{{ url_for('likes') }}">♡ Curtidas</a>
     </nav>
+    <!-- Botão de recolher/expandir colocado no meio do menu -->
+    <button type="button" class="sidebar-toggle-btn" id="sidebarToggle" title="Esconder/Mostrar menu" onclick="toggleSidebar()">
+      <span>◀</span>
+    </button>
     {% if current_user.access_level == "ADMIN" %}
     <div class="nav-title">ADMINISTRAÇÃO </div>
     <nav>

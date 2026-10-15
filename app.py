@@ -5,7 +5,7 @@ from functools import wraps
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from flask import Flask, Response, abort, flash, redirect, render_template, request, send_file, session, stream_with_context, url_for
+from flask import Flask, Response, abort, flash, redirect, render_template, request, send_file, session, stream_with_context, url_for, jsonify
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect
 from googleapiclient.http import MediaIoBaseDownload
@@ -382,9 +382,36 @@ def stream_media(media_id):
         return Response(stream_with_context(generate()), mimetype=media.mime_type or "video/mp4")
     except DriveConfigError:
         abort(503)
- 
 
- # ---------------- ADMIN ----------------
+
+# ---------------- ADMIN & GERENCIAMENTO DE MÍDIA ----------------
+
+@app.post("/admin/media/<int:media_id>/delete")
+@admin_required
+def admin_delete_media(media_id):
+    media = db.session.get(Media, media_id)
+    if not media:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": False, "error": "Mídia não encontrada."}), 404
+        flash("Mídia não encontrada.", "error")
+        return redirect(request.referrer or url_for("index"))
+
+    audit("DELETE_MEDIA", media_id=media.id, details={"name": media.name, "album_id": media.album_id})
+
+    # Remove os registos vinculados
+    Like.query.filter_by(media_id=media.id).delete()
+    Favorite.query.filter_by(media_id=media.id).delete()
+    View.query.filter_by(media_id=media.id).delete()
+    AuditLog.query.filter_by(media_id=media.id).delete()
+
+    db.session.delete(media)
+    db.session.commit()
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"success": True, "message": "Mídia excluída com sucesso."})
+
+    flash("Mídia excluída com sucesso.", "success")
+    return redirect(request.referrer or url_for("album", album_id=media.album_id))
 
 @app.get("/admin")
 @admin_required
@@ -540,19 +567,28 @@ def admin_album_classification(album_id):
     return redirect(url_for("admin_albums"))
 
 
-# NOVA ROTA: Alterar nível de acesso de um arquivo individualmente
 @app.post("/admin/media/<int:media_id>/classification")
 @admin_required
 def admin_media_classification(media_id):
     media = db.session.get(Media, media_id)
     if not media:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": False, "error": "Mídia não encontrada."}), 404
         abort(404)
+    
     classification = request.form.get("classification")
     if classification not in {"PUBLIC", "NORMAL", "RESTRICTED"}:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": False, "error": "Classificação inválida."}), 400
         abort(400)
+
     media.access_classification = classification
     db.session.commit()
     audit("CHANGE_MEDIA_CLASSIFICATION", details={"media_id": media.id, "classification": classification})
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"success": True})
+
     flash("Classificação do arquivo atualizada.", "success")
     return redirect(request.referrer or url_for("album", album_id=media.album_id))
 
