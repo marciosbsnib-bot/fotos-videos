@@ -827,10 +827,13 @@ def admin_drive_sync():
         flash(f"Falha ao sincronizar o Drive: {exc}", "error")
     return redirect(url_for("admin_drive"))
 
+
 @app.get("/mural")
 @approved_required
 def mural():
-    all_media = Media.query.order_by(Media.created_at.desc()).all()
+    # Busca direto no banco ordenado do mais recente, limitando a 120 registros para otimizar a performance
+    all_media = Media.query.order_by(Media.created_at.desc()).limit(60).all()
+    
     media_list = []
     for m in all_media:
         if can_view(m):
@@ -844,8 +847,7 @@ def mural():
             
             media_list.append(m)
     
-    return render_template("mural.html", media=media_list[:70])
-
+    return render_template("mural.html", media=media_list)
 
 @app.errorhandler(403)
 def forbidden(_):
