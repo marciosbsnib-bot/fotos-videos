@@ -844,7 +844,7 @@ def mural():
             
             media_list.append(m)
     
-    return render_template("mural.html", media=media_list[:120])
+    return render_template("mural.html", media=media_list[:70])
 
 
 @app.errorhandler(403)
