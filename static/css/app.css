@@ -839,23 +839,6 @@ th {
   border-radius: 8px 8px 0 0;
 }
 
-/* Ícone de Play / Badge indicando Vídeo */
-.video-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.75);
-  color: #fff;
-  font-size: 0.85rem;
-  padding: 4px 8px;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .video-play-overlay {
   position: absolute;
   top: 50%;
@@ -879,3 +862,4 @@ th {
   background: rgba(88, 166, 255, 0.9);
   transform: translate(-50%, -50%) scale(1.1);
 }
+

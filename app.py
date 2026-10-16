@@ -24,6 +24,14 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 load_dotenv()
 
+# Inicializa o Cloudinary com as variáveis de ambiente do Render/dotenv
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+    secure=True
+)
+
 app = Flask(__name__)
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
@@ -818,6 +826,26 @@ def admin_drive_sync():
         db.session.rollback()
         flash(f"Falha ao sincronizar o Drive: {exc}", "error")
     return redirect(url_for("admin_drive"))
+
+@app.get("/mural")
+@approved_required
+def mural():
+    all_media = Media.query.order_by(Media.created_at.desc()).all()
+    media_list = []
+    for m in all_media:
+        if can_view(m):
+            m.views_cnt = View.query.filter_by(media_id=m.id).count()
+            m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
+            m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
+            
+            # Verifica se o usuário atual já curtiu ou favoritou esta mídia
+            m.is_liked = Like.query.filter_by(user_id=current_user.id, media_id=m.id).first() is not None
+            m.is_favorite = Favorite.query.filter_by(user_id=current_user.id, media_id=m.id).first() is not None
+            
+            media_list.append(m)
+    
+    return render_template("mural.html", media=media_list[:120])
+
 
 @app.errorhandler(403)
 def forbidden(_):

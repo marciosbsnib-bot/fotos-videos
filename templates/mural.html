@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="position-fixed top-0 start-0 w-100 h-100 overflow-hidden" id="mix-container" style="background: transparent; z-index: 10;">
+    <div class="position-absolute top-0 start-0 p-4 z-3" style="pointer-events: none;">
+        <h2 class="text-white fw-bold shadow-sm">📌 Mural</h2>
+    </div>
+</div>
+
+<!-- Modal de Tela Cheia -->
+<div id="mediaModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content-wrapper">
+        <button class="close-modal-btn" onclick="closeModal()">&times;</button>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<style>
+    .mixed-photo {
+        position: absolute;
+        background: #ffffff;
+        padding: 6px; /* Borda fininha e elegante ao redor da foto tipo polaroid moderna */
+        box-shadow: 0 15px 35px rgba(0,0,0,0.7);
+        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), z-index 0.3s ease, box-shadow 0.3s ease;
+        user-select: none;
+        width: 200px;
+        border-radius: 8px;
+    }
+    .mixed-photo-wrapper {
+        position: relative;
+        width: 100%;
+        height: 160px; /* Foto com mais destaque vertical */
+        cursor: pointer;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .mixed-photo img, .mixed-photo video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        display: block;
+        background-color: #222;
+        transition: transform 0.3s ease;
+    }
+    .mixed-photo:hover {
+        transform: scale(1.25) rotate(0deg) !important;
+        z-index: 99999 !important;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+    }
+    .mixed-photo:hover img, .mixed-photo:hover video {
+        transform: scale(1.05);
+    }
+
+    /* Barra Glassmorphic Flutuante sobreposta na foto */
+    .mural-glass-bar {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        background: rgba(20, 20, 20, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 20px;
+        padding: 5px 10px;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        z-index: 5;
+    }
+
+    .mural-action-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #ddd;
+        transition: transform 0.2s, color 0.2s;
+        text-decoration: none;
+        padding: 0;
+    }
+    .mural-action-btn:hover {
+        transform: scale(1.15);
+        color: #fff;
+    }
+    .mural-action-btn.active-like {
+        color: #f77f00;
+        font-weight: bold;
+    }
+    .mural-action-btn.active-fav {
+        color: #ff4d6d;
+        font-weight: bold;
+    }
+
+    /* Botão de Lixeira Flutuante para Admin */
+    .mural-admin-delete {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(220, 53, 69, 0.85);
+        border: none;
+        color: #fff;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        z-index: 6;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        transition: transform 0.2s, background 0.2s;
+        opacity: 0; /* Aparece apenas ao passar o mouse na foto */
+    }
+    .mixed-photo:hover .mural-admin-delete {
+        opacity: 1;
+    }
+    .mural-admin-delete:hover {
+        transform: scale(1.15);
+        background: rgb(220, 53, 69);
+    }
+
+    /* Ícone de Play centralizado nos vídeos */
+    .video-play-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 42px;
+        height: 42px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        pointer-events: none;
+        z-index: 4;
+    }
+    .video-play-overlay::after {
+        content: "";
+        display: block;
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 8px 0 8px 14px;
+        border-color: transparent transparent transparent #ffffff;
+        margin-left: 3px;
+    }
+
+    /* Modal de Tela Cheia */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 999999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(8px);
+    }
+    .modal-content-wrapper {
+        position: relative;
+        width: 98vw;
+        height: 95vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content-wrapper img, 
+    .modal-content-wrapper video {
+        max-width: 98vw;
+        max-height: 94vh;
+        border-radius: 4px;
+        box-shadow: 0 0 40px rgba(0,0,0,0.9);
+        object-fit: contain;
+    }
+    .close-modal-btn {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.5);
+        border: none;
+        color: #fff;
+        font-size: 40px;
+        line-height: 30px;
+        padding: 5px 12px;
+        border-radius: 50%;
+        cursor: pointer;
+        z-index: 1000000;
+        transition: background 0.2s, color 0.2s;
+    }
+    .close-modal-btn:hover {
+        background: rgba(255, 0, 0, 0.8);
+        color: #fff;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof toggleSidebar === 'function') {
+            const sidebar = document.querySelector('.sidebar') || document.querySelector('aside');
+            if (sidebar && !sidebar.classList.contains('collapsed') && !sidebar.classList.contains('hide')) {
+                toggleSidebar();
+            }
+        }
+
+        const container = document.getElementById("mix-container");
+
+        const mediaItems = [
+            {% for m in media %}
+            {
+                id: "{{ m.id }}",
+                url: "{{ m.thumbnail_url or url_for('stream_media', media_id=m.id) }}",
+                fallbackUrl: "{{ url_for('stream_media', media_id=m.id) }}",
+                streamUrl: "{{ url_for('stream_media', media_id=m.id) }}",
+                isVideo: "{{ 'true' if m.mime_type and m.mime_type.startswith('video/') else 'false' }}" === "true",
+                views: "{{ m.views_cnt|default(0) }}",
+                likes: "{{ m.likes_cnt|default(0) }}",
+                favs: "{{ m.favs_cnt|default(0) }}",
+                isLiked: "{{ 'true' if m.is_liked else 'false' }}" === "true",
+                isFavorite: "{{ 'true' if m.is_favorite else 'false' }}" === "true"
+            },
+            {% endfor %}
+        ];
+
+        function renderMural() {
+            container.querySelectorAll('.mixed-photo').forEach(p => p.remove());
+
+            const sidebar = document.querySelector('.sidebar') || document.querySelector('aside');
+            const sidebarWidth = (sidebar && (sidebar.classList.contains('collapsed') || sidebar.classList.contains('hide'))) ? 0 : 250;
+            
+            const containerWidth = window.innerWidth - sidebarWidth - 200;
+            const containerHeight = window.innerHeight - 180;
+
+            mediaItems.forEach((item) => {
+                const div = document.createElement('div');
+                div.classList.add('mixed-photo');
+
+                const randomX = sidebarWidth + Math.max(30, Math.random() * Math.max(100, containerWidth));
+                const randomY = Math.max(90, Math.random() * Math.max(100, containerHeight));
+                const randomRotate = Math.floor(Math.random() * 70) - 35;
+                const randomZ = Math.floor(Math.random() * mediaItems.length);
+
+                div.style.left = randomX + 'px';
+                div.style.top = randomY + 'px';
+                div.style.transform = `rotate(${randomRotate}deg)`;
+                div.style.zIndex = randomZ;
+
+                // Botão de Exclusão da Lixeira (Apenas para ADMIN, flutuante no canto superior da foto ao passar o mouse)
+                {% if current_user.access_level == 'ADMIN' %}
+                const deleteForm = document.createElement('form');
+                deleteForm.action = `/admin/media/${item.id}/delete`;
+                deleteForm.method = 'POST';
+                deleteForm.onsubmit = function() { return confirm('Tem certeza que deseja excluir esta mídia?'); };
+                deleteForm.innerHTML = `
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="mural-admin-delete" title="Excluir mídia">
+                        🗑️
+                    </button>
+                `;
+                div.appendChild(deleteForm);
+                {% endif %}
+
+                // Wrapper da Imagem/Vídeo (clica para abrir a tela cheia)
+                const wrapper = document.createElement('div');
+                wrapper.classList.add('mixed-photo-wrapper');
+
+                const img = document.createElement('img');
+                img.src = item.url;
+                img.loading = "lazy";
+
+                img.onerror = function() {
+                    if (img.src !== item.fallbackUrl) {
+                        img.src = item.fallbackUrl;
+                    }
+                };
+
+                wrapper.appendChild(img);
+
+                if (item.isVideo) {
+                    const playOverlay = document.createElement('div');
+                    playOverlay.classList.add('video-play-overlay');
+                    wrapper.appendChild(playOverlay);
+                }
+
+                wrapper.addEventListener('click', function() {
+                    openModal(item);
+                });
+
+                div.appendChild(wrapper);
+
+                // Barra Glassmorphic Flutuante sobreposta na parte inferior da foto
+                const glassBar = document.createElement('div');
+                glassBar.classList.add('mural-glass-bar');
+
+                glassBar.innerHTML = `
+                    <span title="Visualizações" style="font-size: 11px; color: #ccc;">👁️ ${item.views}</span>
+                    
+                    <form action="/media/${item.id}/like" method="POST" style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="mural-action-btn ${item.isLiked ? 'active-like' : ''}" title="Curtir">
+                            🤘 ${item.likes}
+                        </button>
+                    </form>
+
+                    <form action="/media/${item.id}/favorite" method="POST" style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="mural-action-btn ${item.isFavorite ? 'active-fav' : ''}" title="Favoritar">
+                            ❤️ ${item.favs}
+                        </button>
+                    </form>
+                `;
+
+                div.appendChild(glassBar);
+                container.appendChild(div);
+            });
+        }
+
+        renderMural();
+
+        const toggleBtn = document.querySelector('#sidebarToggle') || document.querySelector('.toggle-btn') || document.querySelector('.fa-chevron-left');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                setTimeout(renderMural, 300);
+            });
+        }
+    });
+
+    function openModal(item) {
+        const modal = document.getElementById("mediaModal");
+        const modalBody = document.getElementById("modalBody");
+        modalBody.innerHTML = "";
+
+        if (item.isVideo) {
+            const video = document.createElement('video');
+            video.src = item.streamUrl;
+            video.controls = true;
+            video.autoplay = true;
+            modalBody.appendChild(video);
+        } else {
+            const img = document.createElement('img');
+            img.src = item.streamUrl;
+            modalBody.appendChild(img);
+        }
+
+        modal.style.display = "flex";
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("mediaModal");
+        const modalBody = document.getElementById("modalBody");
+        modal.style.display = "none";
+        modalBody.innerHTML = "";
+    }
+
+    window.addEventListener('click', function(event) {
+        const modal = document.getElementById("mediaModal");
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+</script>
+{% endblock %}

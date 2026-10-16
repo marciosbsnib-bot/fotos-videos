@@ -16,6 +16,7 @@
             </div>
             <nav>
                 <a href="{{ url_for('index') }}">Álbuns</a>
+                <a href="{{ url_for('mural') }}">Mural</a>
                 <a href="{{ url_for('favorites') }}">Favoritos</a>
                 <a href="{{ url_for('likes') }}">Curtidas</a>
                 {% if current_user.access_level == 'ADMIN' %}
