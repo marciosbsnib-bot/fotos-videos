@@ -832,7 +832,7 @@ def admin_drive_sync():
 @approved_required
 def mural():
     # Busca direto no banco ordenado do mais recente, limitando a 120 registros para otimizar a performance
-    all_media = Media.query.order_by(Media.created_at.desc()).limit(60).all()
+    all_media = Media.query.order_by(Media.created_at.desc()).limit(25).all()
     
     media_list = []
     for m in all_media:
