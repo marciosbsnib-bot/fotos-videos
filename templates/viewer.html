@@ -29,14 +29,14 @@
     <!-- ESQUERDA: Contadores Clicáveis (Curtir e Favoritar com ícone Heavy Metal) -->
     <div class="viewer-stats-group">
       {% if settings.show_views %}
-        <span class="stat-badge" title="Visualizações">👁️ {{ view_count }}</span>
+        <span class="stat-badge" title="Visualizações"><i class="fa-regular fa-eye"></i> {{ view_count }}</span>
       {% endif %}
 
       {% if settings.show_likes %}
         <form action="{{ url_for('toggle_like', media_id=media.id) }}" method="POST" style="display: inline;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="stat-btn {% if liked %}active{% endif %}" title="Curtir">
-            🤘 {{ like_count }}
+            <img src="{{ url_for('static', filename='icons/heavy-metal.png') }}" alt="Curtir" width="16" height="16" style="object-fit: contain;"> {{ like_count }}
           </button>
         </form>
       {% endif %}
@@ -45,7 +45,7 @@
         <form action="{{ url_for('toggle_favorite', media_id=media.id) }}" method="POST" style="display: inline;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="stat-btn {% if favorite %}active{% endif %}" title="Favoritar">
-            ❤️ {{ favorite_count }}
+             <i class="fa-solid fa-heart"></i> {{ favorite_count }}
           </button>
         </form>
       {% endif %}

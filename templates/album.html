@@ -8,13 +8,13 @@
 
   <div class="gallery-grid">
     {% for item in media %}
-      <div class="media-card" id="media-card-{{ item.id }}">
+      <div class=" privacy-select" id="media-card-{{ item.id }}">
         
         <a href="{{ url_for('media_view', media_id=item.id) }}" class="media-card-link">
           {% if item.mime_type and item.mime_type.startswith('video/') %}
             
             <!-- Ícones sobrepostos indicando que é um Vídeo -->
-            <div class="video-play-overlay">▶</div>
+            <div class="video-play-overlay"></div>
 
             {% if item.cloudinary_public_id and item.thumbnail_url %}
               <!-- VÍDEO DO CLOUDINARY: usa imagem da capa estática .jpg -->
@@ -41,20 +41,33 @@
 
         <div class="media-info">
           
-          <!-- ESTATÍSTICAS DA MÍDIA -->
-          <div class="media-stats">
-            {% if settings.show_views %}
-              <span>👁️ {{ item.views_cnt }}</span>
-            {% endif %}
-            {% if settings.show_likes %}
-              <span>🤘 {{ item.likes_cnt }}</span>
-            {% endif %}
-            {% if settings.show_favorites %}
-              <span>❤️ {{ item.favs_cnt }}</span>
-            {% endif %}
+          <!-- ESTATÍSTICAS E BOTÕES DE AÇÃO (CURTIR / FAVORITAR) -->
+          <div class="media-stats-actions" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div class="media-stats">
+              <span><i class="fa-regular fa-eye"></i> {{ item.views_cnt|default(0) }}</span>
+            </div>
+
+            <div class="media-actions-buttons" style="display: flex; gap: 6px;">
+              <!-- Botão Curtir -->
+              <form action="{{ url_for('toggle_like', media_id=item.id) }}" method="POST" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="mural-action-btn {% if item.is_liked %}active-like{% endif %}" title="Curtir">
+                  <img src="{{ url_for('static', filename='icons/heavy-metal.png') }}" alt="Curtir" width="16" height="16" style="object-fit: contain;">
+                 <!--<i class="fa-solid fa-fire"></i>--> <span class="like-count">{{ item.likes_cnt|default(0) }}</span>
+                </button>
+              </form>
+
+              <!-- Botão Favoritar -->
+              <form action="{{ url_for('toggle_favorite', media_id=item.id) }}" method="POST" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="mural-action-btn {% if item.is_favorite %}active-fav{% endif %}" title="Favoritar">
+                  <i class="fa-solid fa-heart"></i> <span class="fav-count">{{ item.favs_cnt|default(0) }}</span>
+                </button>
+              </form>
+            </div>
           </div>
 
-          <!-- AÇÕES DE PRIVACIDADE E EXCLUSÃO -->
+          <!-- AÇÕES DE PRIVACIDADE E EXCLUSÃO (ADMIN) -->
           <div class="media-actions">
             {% if current_user.access_level == 'ADMIN' %}
               <select class="privacy-select" onchange="alterarPrivacidade({{ item.id }}, this.value)">
@@ -63,9 +76,13 @@
                 <option value="RESTRICTED" {% if item.access_classification == 'RESTRICTED' %}selected{% endif %}>Restrito</option>
               </select>
 
-              <button type="button" class="btn-delete" onclick="eliminarMedia({{ item.id }})" title="Excluir foto/vídeo">
-                🗑️
-              </button>
+              <!-- Formulário de exclusão assíncrona alinhado com o app.js -->
+              <form action="{{ url_for('admin_delete_media', media_id=item.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir esta mídia?');" style="margin: 0; display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-delete" title="Excluir foto/vídeo">
+                  🗑️
+                </button>
+              </form>
             {% else %}
               <select class="privacy-select" disabled>
                 <option>{% if item.access_classification == 'PUBLIC' %}Público{% elif item.access_classification == 'NORMAL' %}Normal{% else %}Restrito{% endif %}</option>

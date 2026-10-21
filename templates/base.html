@@ -3,38 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <!-- Meta tag CSRF necessária para as requisições AJAX do app.js -->
+  <!-- Meta tag CSRF para requisições AJAX -->
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{{ title or "Fotos&Vídeos" }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 <div class="app">
   {% if current_user.is_authenticated and current_user.status == "APPROVED" %}
   <aside class="sidebar" id="sidebar">
     <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">M</span> Fotos&Vídeos</a>
+    
     <nav>
       <a href="{{ url_for('index') }}">⌂ Início</a>
+      <a href="{{ url_for('mural') }}">📌 Mural</a>
       <a href="{{ url_for('favorites') }}">♡ Favoritos</a>
       <a href="{{ url_for('likes') }}">♡ Curtidas</a>
     </nav>
-    <!-- Botão de recolher/expandir colocado no meio do menu -->
+
+    <!-- Botão para esconder/mostrar menu -->
     <button type="button" class="sidebar-toggle-btn" id="sidebarToggle" title="Esconder/Mostrar menu" onclick="toggleSidebar()">
       <span>◀</span>
     </button>
+
+    <!-- Seção exclusiva para ADMINISTRADORES -->
     {% if current_user.access_level == "ADMIN" %}
-    <div class="nav-title">ADMINISTRAÇÃO </div>
+    <div class="nav-title">ADMINISTRAÇÃO</div>
     <nav>
       <a href="{{ url_for('admin_dashboard') }}">▦ Painel Admin</a>
       <a href="{{ url_for('admin_users') }}">♙ Usuários</a>
       <a href="{{ url_for('admin_albums') }}">▣ Álbuns</a>
-      <a href="{{ url_for('admin_logs') }}">≡ Logs</a>
-      <a href="{{ url_for('admin_settings') }}">⚙ Configurações</a>
-      <!-- Cloudinary posicionado acima do Google Drive -->
       <a href="{{ url_for('admin_cloudinary') }}">☁️ Cloudinary</a>
       <a href="{{ url_for('admin_drive') }}">🤖 Google Drive</a>
+      <a href="{{ url_for('admin_settings') }}">⚙ Configurações</a>
+      <a href="{{ url_for('admin_logs') }}">≡ Logs</a>
     </nav>
     {% endif %}
+
     <div class="sidebar-bottom">
       <span>{{ current_user.name }}</span>
       <a href="{{ url_for('logout') }}">Sair</a>
@@ -48,6 +54,7 @@
         <div class="flash {{ category }}">{{ message }}</div>
       {% endfor %}
     {% endwith %}
+    
     {% block content %}{% endblock %}
   </main>
 </div>

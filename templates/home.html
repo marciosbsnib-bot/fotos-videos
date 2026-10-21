@@ -1,115 +1,80 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Álbuns</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-</head>
-<body>
-    <div class="app">
-        <!-- BARRA LATERAL -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-mark">M</div>
-                <span>Fotos & Vídeos</span>
-            </div>
-            <nav>
-                <a href="{{ url_for('index') }}">Álbuns</a>
-                <a href="{{ url_for('mural') }}">Mural</a>
-                <a href="{{ url_for('favorites') }}">Favoritos</a>
-                <a href="{{ url_for('likes') }}">Curtidas</a>
-                {% if current_user.access_level == 'ADMIN' %}
-                    <div class="nav-title">ADMINISTRAÇÃO</div>
-                    <a href="{{ url_for('admin_dashboard') }}">Painel Admin</a>
-                    <a href="{{ url_for('admin_users') }}">Usuários</a>
-                    <a href="{{ url_for('admin_albums') }}">Gerenciar Álbuns</a>
-                    <a href="{{ url_for('admin_cloudinary') }}">Cloudinary</a>
-                    <a href="{{ url_for('admin_drive') }}">Google Drive</a>
-                    <a href="{{ url_for('admin_settings') }}">Configurações</a>
-                    <a href="{{ url_for('admin_logs') }}">Logs de Auditoria</a>
-                {% endif %}
-            </nav>
+{% extends "base.html" %}
 
-            <div class="sidebar-bottom">
-                <span>{{ current_user.name }}</span>
-                <a href="{{ url_for('logout') }}">Sair</a>
-            </div>
-        </aside>
-
-        <!-- CONTEÚDO PRINCIPAL -->
-        <main class="main">
-            <header class="topbar">
-                <div>
-                    <h1>Álbuns</h1>
-                    <p class="muted">Selecione um álbum para visualizar as mídias</p>
-                </div>
-                <div class="user-pill">
-                    {{ current_user.email }} ({{ current_user.access_level }})
-                </div>
-            </header>
-
-            <!-- GRID DE ÁLBUNS -->
-            <section class="album-grid">
-                {% for album in albums %}
-                    <!-- Filtra cover_medias para pegar APENAS IMAGENS -->
-                    {% set image_covers = [] %}
-                    {% for item in album.cover_medias %}
-                        {% if item.mime_type and item.mime_type.startswith('image/') %}
-                            {% set _ = image_covers.append(item) %}
-                        {% endif %}
-                    {% endfor %}
-
-                    {% set count = image_covers|length %}
-
-                    <div class="album-card" style="position: relative;">
-                        <a href="{{ url_for('album', album_id=album.id) }}" class="album-cover count-{{ count }} {% if count == 0 %}empty{% endif %}">
-                            {% if count > 0 %}
-                                {% for item in image_covers %}
-                                    <img 
-                                        src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" 
-                                        alt="{{ item.name }}" 
-                                        class="cover-item"
-                                        loading="lazy"
-                                        referrerpolicy="no-referrer"
-                                    >
-                                {% endfor %}
-                            {% else %}
-                                <span>Sem mídias</span>
-                            {% endif %}
-                        </a>
-
-                        <div class="album-info" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <h3>
-                                    <a href="{{ url_for('album', album_id=album.id) }}">{{ album.name }}</a>
-                                </h3>
-                                <span class="badge {{ album.access_classification|lower }}">
-                                    {{ album.access_classification }}
-                                </span>
-                            </div>
-
-                            <!-- Botão de Lixeira para Admin Excluir Álbum -->
-                            {% if current_user.access_level == 'ADMIN' %}
-                                <form action="{{ url_for('admin_delete_album', album_id=album.id) }}" 
-                                      method="POST" 
-                                      onsubmit="return confirm('Tem certeza que deseja excluir o álbum \'{{ album.name }}\'?');"
-                                      style="margin: 0;">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn-delete" title="Excluir Álbum" style="background: none; border: none; cursor: pointer; font-size: 1.1rem;">
-                                        🗑️
-                                    </button>
-                                </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="empty">
-                        <p>Nenhum álbum disponível no momento.</p>
-                    </div>
-                {% endfor %}
-            </section>
-        </main>
+{% block content %}
+<header class="topbar">
+    <div>
+        <h1>Álbuns</h1>
+        <p class="muted">Selecione um álbum para visualizar as mídias</p>
     </div>
-</body>
-</html>
+    <div class="user-pill">
+        {{ current_user.email }} ({{ current_user.access_level }})
+    </div>
+</header>
+
+<!-- GRID DE ÁLBUNS -->
+<section class="album-grid">
+    {% for album in albums %}
+        <!-- Filtra cover_medias para pegar APENAS IMAGENS -->
+        {% set image_covers = [] %}
+        {% for item in album.cover_medias %}
+            {% if item.mime_type and item.mime_type.startswith('image/') %}
+                {% set _ = image_covers.append(item) %}
+            {% endif %}
+        {% endfor %}
+
+        {% set cover_count = image_covers|length %}
+        {% set total_media = album.media.count() %}
+
+        <div class="album-card" style="position: relative;">
+            <a href="{{ url_for('album', album_id=album.id) }}" class="album-cover count-{{ cover_count }} {% if cover_count == 0 %}empty{% endif %}">
+                <!-- Bolinha com total de arquivos do álbum (Canto Superior Esquerdo) -->
+                <span class="album-badge-count" title="{{ total_media }} arquivos">
+                    {{ total_media }}
+                </span>
+
+                {% if cover_count > 0 %}
+                    {% for item in image_covers %}
+                        <img 
+                            src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" 
+                            alt="{{ item.name }}" 
+                            class="cover-item"
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                        >
+                    {% endfor %}
+                {% else %}
+                    <span>Sem mídias</span>
+                {% endif %}
+            </a>
+
+            <div class="album-info" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3>
+                        <a href="{{ url_for('album', album_id=album.id) }}">{{ album.name }}</a>
+                    </h3>
+                    <span class="badge {{ album.access_classification|lower }}">
+                        {{ album.access_classification }}
+                    </span>
+                </div>
+
+                <!-- Botão de Lixeira para Admin Excluir Álbum -->
+                {% if current_user.access_level == 'ADMIN' %}
+                    <form action="{{ url_for('admin_delete_album', album_id=album.id) }}" 
+                          method="POST" 
+                          onsubmit="return confirm('Tem certeza que deseja excluir o álbum \'{{ album.name }}\'?');"
+                          style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-delete" title="Excluir Álbum" style="background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                            🗑️
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="empty">
+            <p>Nenhum álbum disponível no momento.</p>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

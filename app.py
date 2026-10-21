@@ -232,37 +232,57 @@ def logout():
     return redirect(url_for("login"))
 
 
+from sqlalchemy import func
+
 @app.get("/albums/<int:album_id>")
 @approved_required
 def album(album_id):
-    item = db.session.get(Album, album_id)
-    if not item:
+    album = db.session.get(Album, album_id)
+    if not album:
         abort(404)
+        
+    # Verifica permissão de acesso ao álbum
     if current_user.access_level != "ADMIN":
-        if item.access_classification == "RESTRICTED":
+        if album.access_classification == "RESTRICTED":
             abort(403)
-        if item.access_classification == "NORMAL" and current_user.access_level != "NORMAL":
+        if album.access_classification == "NORMAL" and current_user.access_level == "BASIC":
             abort(403)
 
-    media_items = item.media.order_by(Media.created_at.desc()).all()
+    # Busca todas as mídias do álbum ordenadas por data
+    all_media = album.media.order_by(Media.created_at.desc()).all()
+    
+    # Filtra mídias permitidas para visualização pelo usuário
+    visible_media = [m for m in all_media if can_view(m)]
+    media_ids = [m.id for m in visible_media]
+
+    # Busca estatísticas em lote (evita centenas de queries individuais)
+    views_counts = dict(db.session.query(View.media_id, func.count(View.id)).filter(View.media_id.in_(media_ids)).group_by(View.media_id).all()) if media_ids else {}
+    likes_counts = dict(db.session.query(Like.media_id, func.count(Like.id)).filter(Like.media_id.in_(media_ids)).group_by(Like.media_id).all()) if media_ids else {}
+    favs_counts = dict(db.session.query(Favorite.media_id, func.count(Favorite.id)).filter(Favorite.media_id.in_(media_ids)).group_by(Favorite.media_id).all()) if media_ids else {}
+
+    user_likes = {l.media_id for l in Like.query.filter_by(user_id=current_user.id).filter(Like.media_id.in_(media_ids)).all()} if media_ids else set()
+    user_favs = {f.media_id for f in Favorite.query.filter_by(user_id=current_user.id).filter(Favorite.media_id.in_(media_ids)).all()} if media_ids else set()
+
     media_list = []
-    for m in media_items:
-        if can_view(m):
-            m.views_cnt = View.query.filter_by(media_id=m.id).count()
-            m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
-            m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
+    for m in visible_media:
+        m.views_cnt = views_counts.get(m.id, 0)
+        m.likes_cnt = likes_counts.get(m.id, 0)
+        m.favs_cnt = favs_counts.get(m.id, 0)
 
-            # CORREÇÃO: Mantém a regra do thumbnail .jpg apenas se for vídeo do Cloudinary,
-            # sem sobrescrever a URL principal do arquivo de mídia.
-            if m.cloudinary_public_id and m.mime_type and m.mime_type.startswith("video/"):
-                if m.thumbnail_url and not m.thumbnail_url.endswith(".jpg"):
-                    base_url = m.thumbnail_url.rsplit('.', 1)[0]
-                    m.thumbnail_url = f"{base_url}.jpg"
+        m.is_liked = m.id in user_likes
+        m.is_favorite = m.id in user_favs
 
-            media_list.append(m)
+        # Usa a URL padrão salva ou stream caso não haja Cloudinary otimizado
+        if not hasattr(m, 'display_url') or not m.display_url:
+            m.display_url = m.thumbnail_url or url_for('stream_media', media_id=m.id)
 
-    return render_template("album.html", album=item, media=media_list)
+        media_list.append(m)
 
+    return render_template(
+        "album.html",
+        album=album,
+        media=media_list
+    )
 
 @app.get("/media/<int:media_id>")
 @approved_required
@@ -306,41 +326,73 @@ def media_view(media_id):
     )
 
 
+from flask import jsonify
+
 @app.post("/media/<int:media_id>/like")
 @approved_required
 def toggle_like(media_id):
     media = db.session.get(Media, media_id)
-    if not media or not can_view(media):
+    if not media:
         abort(404)
-    like = Like.query.filter_by(user_id=current_user.id, media_id=media.id).first()
-    if like:
-        db.session.delete(like)
-        action = "UNLIKE"
+        
+    existing = Like.query.filter_by(user_id=current_user.id, media_id=media_id).first()
+    if existing:
+        db.session.delete(existing)
+        liked = False
     else:
-        db.session.add(Like(user_id=current_user.id, media_id=media.id))
-        action = "LIKE"
+        db.session.add(Like(user_id=current_user.id, media_id=media_id))
+        liked = True
     db.session.commit()
-    audit(action, media.id)
-    return redirect(request.referrer or url_for("media_view", media_id=media.id))
-
+    
+    likes_count = Like.query.filter_by(media_id=media_id).count()
+    
+    # Verifica se a requisição é assíncrona (AJAX/Fetch)
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
+        return jsonify({"success": True, "liked": liked, "likes_count": likes_count})
+        
+    return redirect(request.referrer or url_for("mural"))
 
 @app.post("/media/<int:media_id>/favorite")
 @approved_required
 def toggle_favorite(media_id):
     media = db.session.get(Media, media_id)
-    if not media or not can_view(media):
+    if not media:
         abort(404)
-    fav = Favorite.query.filter_by(user_id=current_user.id, media_id=media.id).first()
-    if fav:
-        db.session.delete(fav)
-        action = "UNFAVORITE"
+        
+    existing = Favorite.query.filter_by(user_id=current_user.id, media_id=media_id).first()
+    if existing:
+        db.session.delete(existing)
+        favorited = False
     else:
-        db.session.add(Favorite(user_id=current_user.id, media_id=media.id))
-        action = "FAVORITE"
+        db.session.add(Favorite(user_id=current_user.id, media_id=media_id))
+        favorited = True
     db.session.commit()
-    audit(action, media.id)
-    return redirect(request.referrer or url_for("media_view", media_id=media.id))
+    
+    favs_count = Favorite.query.filter_by(media_id=media_id).count()
+    
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
+        return jsonify({"success": True, "favorited": favorited, "favs_count": favs_count})
+        
+    return redirect(request.referrer or url_for("mural"))
 
+@app.post("/admin/media/<int:media_id>/delete")
+@admin_required
+def admin_delete_media(media_id):
+    media = db.session.get(Media, media_id)
+    if not media:
+        abort(404)
+        
+    Like.query.filter_by(media_id=media_id).delete()
+    Favorite.query.filter_by(media_id=media_id).delete()
+    View.query.filter_by(media_id=media_id).delete()
+    
+    db.session.delete(media)
+    db.session.commit()
+    
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+        return {"success": True}
+        
+    return redirect(request.referrer or url_for("mural"))
 
 @app.get("/favorites")
 @approved_required
@@ -421,31 +473,7 @@ def stream_media(media_id):
 
 # ---------------- ADMIN & GERENCIAMENTO DE MÍDIA ----------------
 
-@app.post("/admin/media/<int:media_id>/delete")
-@admin_required
-def admin_delete_media(media_id):
-    media = db.session.get(Media, media_id)
-    if not media:
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"success": False, "error": "Mídia não encontrada."}), 404
-        flash("Mídia não encontrada.", "error")
-        return redirect(request.referrer or url_for("index"))
 
-    audit("DELETE_MEDIA", media_id=media.id, details={"name": media.name, "album_id": media.album_id})
-
-    Like.query.filter_by(media_id=media.id).delete()
-    Favorite.query.filter_by(media_id=media.id).delete()
-    View.query.filter_by(media_id=media.id).delete()
-    AuditLog.query.filter_by(media_id=media.id).delete()
-
-    db.session.delete(media)
-    db.session.commit()
-
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify({"success": True, "message": "Mídia excluída com sucesso."})
-
-    flash("Mídia excluída com sucesso.", "success")
-    return redirect(request.referrer or url_for("album", album_id=media.album_id))
 
 
 @app.get("/admin")
@@ -580,10 +608,27 @@ def admin_delete_album(album_id):
     album = db.session.get(Album, album_id)
     if not album:
         abort(404)
+    
+    # Coleta todas as mídias pertencentes ao álbum
+    media_items = album.media.all()
+    media_ids = [m.id for m in media_items]
+
+    if media_ids:
+        # Remove todas as dependências associadas às mídias deste álbum
+        Like.query.filter(Like.media_id.in_(media_ids)).delete(synchronize_session=False)
+        Favorite.query.filter(Favorite.media_id.in_(media_ids)).delete(synchronize_session=False)
+        View.query.filter(View.media_id.in_(media_ids)).delete(synchronize_session=False)
+        AuditLog.query.filter(AuditLog.media_id.in_(media_ids)).delete(synchronize_session=False)
+        
+        # Remove as mídias do álbum
+        Media.query.filter(Media.album_id == album.id).delete(synchronize_session=False)
+
+    # Deleta o álbum
     db.session.delete(album)
     db.session.commit()
+    
     audit("DELETE_ALBUM", details={"album_id": album_id})
-    flash("Álbum deletado do site com sucesso.", "success")
+    flash("Álbum e todas as suas mídias/vinculações foram deletados do site com sucesso.", "success")
     return redirect(url_for("admin_albums"))
 
 
@@ -827,26 +872,78 @@ def admin_drive_sync():
         flash(f"Falha ao sincronizar o Drive: {exc}", "error")
     return redirect(url_for("admin_drive"))
 
+## MURAL ##
+from sqlalchemy import func
+
+# Variável simples em memória para cache rápido das URLs/mídias do mural (válida por 5 minutos)
+_mural_cache = {"data": None, "timestamp": 0}
 
 @app.get("/mural")
 @approved_required
 def mural():
-    # Busca direto no banco ordenado do mais recente, limitando a 120 registros para otimizar a performance
-    all_media = Media.query.order_by(Media.created_at.desc()).limit(25).all()
+    global _mural_cache
+    now_ts = datetime.now().timestamp()
     
-    media_list = []
-    for m in all_media:
-        if can_view(m):
-            m.views_cnt = View.query.filter_by(media_id=m.id).count()
-            m.likes_cnt = Like.query.filter_by(media_id=m.id).count()
-            m.favs_cnt = Favorite.query.filter_by(media_id=m.id).count()
-            
-            # Verifica se o usuário atual já curtiu ou favoritou esta mídia
-            m.is_liked = Like.query.filter_by(user_id=current_user.id, media_id=m.id).first() is not None
-            m.is_favorite = Favorite.query.filter_by(user_id=current_user.id, media_id=m.id).first() is not None
-            
+    # Usa cache em memória por 300 segundos (5 minutos) para carga instantânea
+    if _mural_cache["data"] and (now_ts - _mural_cache["timestamp"] < 300):
+        media_list = _mural_cache["data"]
+    else:
+        all_media = (
+            Media.query
+            .order_by(Media.created_id.desc() if hasattr(Media, 'created_id') else Media.created_at.desc())
+            .limit(35)
+            .all()
+        )
+
+        # Busca contagens em lote para evitar queries N+1 no banco
+        media_ids = [m.id for m in all_media]
+        
+        views_counts = dict(db.session.query(View.media_id, func.count(View.id)).filter(View.media_id.in_(media_ids)).group_by(View.media_id).all()) if media_ids else {}
+        likes_counts = dict(db.session.query(Like.media_id, func.count(Like.id)).filter(Like.media_id.in_(media_ids)).group_by(Like.media_id).all()) if media_ids else {}
+        favs_counts = dict(db.session.query(Favorite.media_id, func.count(Favorite.id)).filter(Favorite.media_id.in_(media_ids)).group_by(Favorite.media_id).all()) if media_ids else {}
+
+        user_likes = {l.media_id for l in Like.query.filter_by(user_id=current_user.id).filter(Like.media_id.in_(media_ids)).all()} if media_ids else set()
+        user_favs = {f.media_id for f in Favorite.query.filter_by(user_id=current_user.id).filter(Favorite.media_id.in_(media_ids)).all()} if media_ids else set()
+
+        media_list = []
+
+        for m in all_media:
+            if not can_view(m):
+                continue
+
+            m.views_cnt = views_counts.get(m.id, 0)
+            m.likes_cnt = likes_counts.get(m.id, 0)
+            m.favs_cnt = favs_counts.get(m.id, 0)
+
+            m.is_liked = m.id in user_likes
+            m.is_favorite = m.id in user_id_favs if 'user_id_favs' in locals() else m.id in user_favs
+
+            # Usa o thumbnail já salvo no banco se existir para evitar reprocessamento
+            if m.thumbnail_url:
+                m.mural_thumbnail_url = m.thumbnail_url
+            elif m.cloudinary_public_id:
+                try:
+                    is_video = bool(m.mime_type and m.mime_type.startswith("video/"))
+                    transformations = [{"width": 200, "height": 160, "crop": "limit"}, {"quality": "auto:low"}]
+                    if is_video:
+                        m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
+                            m.cloudinary_public_id, resource_type="video", format="jpg", transformation=transformations, secure=True
+                        )
+                    else:
+                        transformations.append({"fetch_format": "auto"})
+                        m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
+                            m.cloudinary_public_id, resource_type="image", transformation=transformations, secure=True
+                        )
+                except Exception:
+                    m.mural_thumbnail_url = None
+            else:
+                m.mural_thumbnail_url = url_for('stream_media', media_id=m.id)
+
             media_list.append(m)
-    
+
+        _mural_cache["data"] = media_list
+        _mural_cache["timestamp"] = now_ts
+
     return render_template("mural.html", media=media_list)
 
 @app.errorhandler(403)

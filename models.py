@@ -41,13 +41,20 @@ class Album(db.Model):
     drive_folder_id = db.Column(db.String(255), unique=True)
     access_classification = db.Column(db.String(20), nullable=False, default="PUBLIC")
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    
+    # Garante que ao deletar o álbum, as mídias filhas sejam limpas automaticamente
     media = db.relationship("Media", backref="album", lazy="dynamic", cascade="all, delete-orphan")
 
     @property
     def cover_medias(self):
-        """Retorna até 3 mídias recentes para compor a capa estilo mosaico."""
-        return self.media.order_by(Media.created_at.desc()).limit(3).all()
-
+        """Retorna até 3 mídias do tipo imagem para compor a capa estilo mosaico, ignorando vídeos."""
+        return (
+            self.media
+            .filter(Media.mime_type.like("image/%"))
+            .order_by(Media.created_at.desc())
+            .limit(3)
+            .all()
+        )
 
 class Media(db.Model):
     id = db.Column(db.Integer, primary_key=True)
