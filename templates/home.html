@@ -14,14 +14,8 @@
 <!-- GRID DE ÁLBUNS -->
 <section class="album-grid">
     {% for album in albums %}
-        <!-- Filtra cover_medias para pegar APENAS IMAGENS -->
-        {% set image_covers = [] %}
-        {% for item in album.cover_medias %}
-            {% if item.mime_type and item.mime_type.startswith('image/') %}
-                {% set _ = image_covers.append(item) %}
-            {% endif %}
-        {% endfor %}
-
+        <!-- Obtém as capas filtradas por permissão de acesso do utilizador atual -->
+        {% set image_covers = album.get_cover_medias(current_user) %}
         {% set cover_count = image_covers|length %}
         {% set total_media = album.media.count() %}
 

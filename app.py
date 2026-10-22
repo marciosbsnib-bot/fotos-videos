@@ -881,68 +881,68 @@ _mural_cache = {"data": None, "timestamp": 0}
 @app.get("/mural")
 @approved_required
 def mural():
-    global _mural_cache
-    now_ts = datetime.now().timestamp()
+    # 1. Filtra a consulta de mídias de acordo com o nível de acesso do utilizador logado
+    query = Media.query
+
+    user_level = getattr(current_user, "access_level", "NONE")
+
+    if user_level == "BASIC":
+        query = query.filter(Media.access_classification.in_(["BASIC", "PUBLIC"]))
+    elif user_level != "ADMIN":
+        # Para utilizadores NORMAL ou outros: oculta conteúdos RESTRICTED e PRIVATE
+        query = query.filter(Media.access_classification.notin_(["RESTRICTED", "PRIVATE"]))
+
+    # Ordenação e limite de resultados
+    order_col = Media.created_id.desc() if hasattr(Media, 'created_id') else Media.created_at.desc()
+    all_media = query.order_by(order_col).limit(35).all()
+
+    # 2. Busca contagens em lote para evitar queries N+1
+    media_ids = [m.id for m in all_media]
     
-    # Usa cache em memória por 300 segundos (5 minutos) para carga instantânea
-    if _mural_cache["data"] and (now_ts - _mural_cache["timestamp"] < 300):
-        media_list = _mural_cache["data"]
-    else:
-        all_media = (
-            Media.query
-            .order_by(Media.created_id.desc() if hasattr(Media, 'created_id') else Media.created_at.desc())
-            .limit(35)
-            .all()
-        )
+    views_counts = dict(db.session.query(View.media_id, func.count(View.id)).filter(View.media_id.in_(media_ids)).group_by(View.media_id).all()) if media_ids else {}
+    likes_counts = dict(db.session.query(Like.media_id, func.count(Like.id)).filter(Like.media_id.in_(media_ids)).group_by(Like.media_id).all()) if media_ids else {}
+    favs_counts = dict(db.session.query(Favorite.media_id, func.count(Favorite.id)).filter(Favorite.media_id.in_(media_ids)).group_by(Favorite.media_id).all()) if media_ids else {}
 
-        # Busca contagens em lote para evitar queries N+1 no banco
-        media_ids = [m.id for m in all_media]
-        
-        views_counts = dict(db.session.query(View.media_id, func.count(View.id)).filter(View.media_id.in_(media_ids)).group_by(View.media_id).all()) if media_ids else {}
-        likes_counts = dict(db.session.query(Like.media_id, func.count(Like.id)).filter(Like.media_id.in_(media_ids)).group_by(Like.media_id).all()) if media_ids else {}
-        favs_counts = dict(db.session.query(Favorite.media_id, func.count(Favorite.id)).filter(Favorite.media_id.in_(media_ids)).group_by(Favorite.media_id).all()) if media_ids else {}
+    user_likes = {l.media_id for l in Like.query.filter_by(user_id=current_user.id).filter(Like.media_id.in_(media_ids)).all()} if media_ids else set()
+    user_favs = {f.media_id for f in Favorite.query.filter_by(user_id=current_user.id).filter(Favorite.media_id.in_(media_ids)).all()} if media_ids else set()
 
-        user_likes = {l.media_id for l in Like.query.filter_by(user_id=current_user.id).filter(Like.media_id.in_(media_ids)).all()} if media_ids else set()
-        user_favs = {f.media_id for f in Favorite.query.filter_by(user_id=current_user.id).filter(Favorite.media_id.in_(media_ids)).all()} if media_ids else set()
+    media_list = []
 
-        media_list = []
-
-        for m in all_media:
+    for m in all_media:
+        # Dupla camada de segurança (caso a função can_view tenha regras extras)
+        if 'can_view' in globals() or 'can_view' in locals():
             if not can_view(m):
                 continue
 
-            m.views_cnt = views_counts.get(m.id, 0)
-            m.likes_cnt = likes_counts.get(m.id, 0)
-            m.favs_cnt = favs_counts.get(m.id, 0)
+        m.views_cnt = views_counts.get(m.id, 0)
+        m.likes_cnt = likes_counts.get(m.id, 0)
+        m.favs_cnt = favs_counts.get(m.id, 0)
 
-            m.is_liked = m.id in user_likes
-            m.is_favorite = m.id in user_id_favs if 'user_id_favs' in locals() else m.id in user_favs
+        m.is_liked = m.id in user_likes
+        m.is_favorite = m.id in user_favs
 
-            # Usa o thumbnail já salvo no banco se existir para evitar reprocessamento
-            if m.thumbnail_url:
-                m.mural_thumbnail_url = m.thumbnail_url
-            elif m.cloudinary_public_id:
-                try:
-                    is_video = bool(m.mime_type and m.mime_type.startswith("video/"))
-                    transformations = [{"width": 200, "height": 160, "crop": "limit"}, {"quality": "auto:low"}]
-                    if is_video:
-                        m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
-                            m.cloudinary_public_id, resource_type="video", format="jpg", transformation=transformations, secure=True
-                        )
-                    else:
-                        transformations.append({"fetch_format": "auto"})
-                        m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
-                            m.cloudinary_public_id, resource_type="image", transformation=transformations, secure=True
-                        )
-                except Exception:
-                    m.mural_thumbnail_url = None
-            else:
-                m.mural_thumbnail_url = url_for('stream_media', media_id=m.id)
+        # Lógica de montagem da URL da miniatura
+        if m.thumbnail_url:
+            m.mural_thumbnail_url = m.thumbnail_url
+        elif m.cloudinary_public_id:
+            try:
+                is_video = bool(m.mime_type and m.mime_type.startswith("video/"))
+                transformations = [{"width": 200, "height": 160, "crop": "limit"}, {"quality": "auto:low"}]
+                if is_video:
+                    m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
+                        m.cloudinary_public_id, resource_type="video", format="jpg", transformation=transformations, secure=True
+                    )
+                else:
+                    transformations.append({"fetch_format": "auto"})
+                    m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
+                        m.cloudinary_public_id, resource_type="image", transformation=transformations, secure=True
+                    )
+            except Exception:
+                m.mural_thumbnail_url = None
+        else:
+            m.mural_thumbnail_url = url_for('stream_media', media_id=m.id)
 
-            media_list.append(m)
-
-        _mural_cache["data"] = media_list
-        _mural_cache["timestamp"] = now_ts
+        media_list.append(m)
 
     return render_template("mural.html", media=media_list)
 

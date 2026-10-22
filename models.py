@@ -41,20 +41,37 @@ class Album(db.Model):
     drive_folder_id = db.Column(db.String(255), unique=True)
     access_classification = db.Column(db.String(20), nullable=False, default="PUBLIC")
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
-    
+
     # Garante que ao deletar o álbum, as mídias filhas sejam limpas automaticamente
     media = db.relationship("Media", backref="album", lazy="dynamic", cascade="all, delete-orphan")
 
+    def get_cover_medias(self, user=None, limit=3):
+        """
+        Retorna até 'limit' mídias para a capa em mosaico, respeitando o nível de acesso do usuário.
+        """
+        query = self.media.filter(Media.mime_type.like("image/%"))
+
+        # Determina o nível de acesso do usuário atual
+        user_level = getattr(user, "access_level", "NONE") if user and getattr(user, "is_authenticated", False) else "NONE"
+
+        # Aplicação dos filtros de segurança por nível
+        if user_level == "BASIC":
+            query = query.filter(Media.access_classification.in_(["BASIC", "PUBLIC"]))
+        elif user_level != "ADMIN":
+            # Para usuários NORMAL, ANONYMOUS ou NONE: bloqueia RESTRICTED e PRIVATE
+            query = query.filter(Media.access_classification.notin_(["RESTRICTED", "PRIVATE"]))
+
+        return query.order_by(Media.created_at.desc()).limit(limit).all()
+
     @property
     def cover_medias(self):
-        """Retorna até 3 mídias do tipo imagem para compor a capa estilo mosaico, ignorando vídeos."""
-        return (
-            self.media
-            .filter(Media.mime_type.like("image/%"))
-            .order_by(Media.created_at.desc())
-            .limit(3)
-            .all()
-        )
+        """Fallback para templates Jinja2 utilizando o utilizador logado na sessão ativa."""
+        try:
+            from flask_login import current_user
+            return self.get_cover_medias(user=current_user)
+        except Exception:
+            return self.get_cover_medias(user=None)
+
 
 class Media(db.Model):
     id = db.Column(db.Integer, primary_key=True)
