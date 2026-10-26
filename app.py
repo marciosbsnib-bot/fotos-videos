@@ -34,6 +34,14 @@ cloudinary.config(
 
 app = Flask(__name__)
 
+@app.route('/privacy')
+def privacy_policy():
+    return render_template('privacy.html')
+
+@app.route('/terms')
+def terms_of_service():
+    return render_template('terms.html')
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-me")
