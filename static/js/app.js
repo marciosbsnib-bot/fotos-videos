@@ -352,7 +352,10 @@ document.addEventListener("submit", function(event) {
         .then(data => {
             if (!data.success) return;
 
-            const photoCard = form.closest('.mixed-photo') || form.closest('.media-card');
+            // Localiza o cartão pelo ID, mesmo que ele não tenha a classe media-card.
+                const photoCard = form.closest('[id^="media-card-"]')
+                || form.closest('.mixed-photo')
+                || form.closest('.media-card');
 
             // Caso seja exclusão, remove o card visualmente da tela
             if (actionUrl.includes('/delete') && photoCard) {
