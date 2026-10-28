@@ -2,7 +2,15 @@
 {% block content %}
 <div class="login-page">
   <div class="login-card">
-    <div class="brand large"><span class="brand-mark">M</span> Fotos&Vídeos</div>
+    <div class="brand large"><span class="brand-mark">
+                <img
+        src="{{ url_for('static', filename='icons/logo.png') }}"
+        alt="Logo da galeria"
+        class="brand-logo"
+    >
+
+
+    </span> Fotos&Vídeos</div>
     <p class="muted">Fotos · Vídeos · Memórias</p>
     <h1>Entrar</h1>
     <form method="post" action="{{ url_for('login') }}">

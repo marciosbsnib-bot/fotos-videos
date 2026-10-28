@@ -16,12 +16,11 @@
             <!-- Ícones sobrepostos indicando que é um Vídeo -->
             <div class="video-play-overlay"></div>
 
-            {% if item.cloudinary_public_id and item.thumbnail_url %}
-              <!-- VÍDEO DO CLOUDINARY: usa imagem da capa estática .jpg -->
-              <img class="media-preview" 
-                   src="{{ item.thumbnail_url }}" 
-                   alt="Vídeo Cloudinary" 
-                   loading="lazy">
+{% if item.cloudinary_public_id and (item.mural_thumbnail_url or item.thumbnail_url) %}
+  <img class="media-preview"
+       src="{{ item.mural_thumbnail_url or item.thumbnail_url }}"
+       alt="Vídeo Cloudinary"
+       loading="lazy">
             {% else %}
               <!-- VÍDEO DO GOOGLE DRIVE: faz stream com o parâmetro #t=0.5 para carregar o 1º frame -->
               <video class="media-preview" preload="metadata" muted playsinline>
@@ -31,8 +30,8 @@
 
           {% else %}
             <!-- FOTO (CLOUDINARY OU DRIVE) -->
-            <img class="media-preview" 
-                 src="{{ item.thumbnail_url or url_for('stream_media', media_id=item.id) }}" 
+            <img class="media-preview"                 
+                src="{{ item.mural_thumbnail_url or item.thumbnail_url or url_for('stream_media', media_id=item.id) }}"
                  alt="Foto" 
                  loading="lazy"
                  referrerpolicy="no-referrer">

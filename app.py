@@ -284,9 +284,49 @@ def album(album_id):
         m.is_liked = m.id in user_likes
         m.is_favorite = m.id in user_favs
 
-        # Usa a URL padrão salva ou stream caso não haja Cloudinary otimizado
-        if not hasattr(m, 'display_url') or not m.display_url:
-            m.display_url = m.thumbnail_url or url_for('stream_media', media_id=m.id)
+        m.is_liked = m.id in user_likes
+        m.is_favorite = m.id in user_favs
+
+        # Gera uma miniatura leve para a grade do álbum.
+        if m.cloudinary_public_id:
+            try:
+                is_video = bool(
+                    m.mime_type and m.mime_type.startswith("video/")
+                )
+
+                transformations = [
+                    {"width": 200, "height": 160, "crop": "limit"},
+                    {"quality": "auto:low"}
+                ]
+
+                if is_video:
+                    m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
+                        m.cloudinary_public_id,
+                        resource_type="video",
+                        format="jpg",
+                        transformation=transformations,
+                        secure=True
+                    )
+                else:
+                    transformations.append({"fetch_format": "auto"})
+                    m.mural_thumbnail_url, _ = cloudinary.utils.cloudinary_url(
+                        m.cloudinary_public_id,
+                        resource_type="image",
+                        transformation=transformations,
+                        secure=True
+                    )
+
+            except Exception:
+                m.mural_thumbnail_url = (
+                    m.thumbnail_url
+                    or url_for('stream_media', media_id=m.id)
+                )
+        else:
+            # Mídias de outros provedores mantêm suas URLs existentes.
+            m.mural_thumbnail_url = (
+                m.thumbnail_url
+                or url_for('stream_media', media_id=m.id)
+            )
 
         media_list.append(m)
 

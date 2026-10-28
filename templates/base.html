@@ -12,8 +12,15 @@
 <body>
 <div class="app">
   {% if current_user.is_authenticated and current_user.status == "APPROVED" %}
-  <aside class="sidebar" id="sidebar">
-    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">M</span> Fotos&Vídeos</a>
+  <aside class="sidebar" id="sidebar"> 
+    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">
+          <img
+        src="{{ url_for('static', filename='icons/logo.png') }}"
+        alt="Logo da galeria"
+        class="brand-logo"
+    >
+
+    </span> Fotos&Vídeos</a>
     
     <nav>
       <a href="{{ url_for('index') }}">⌂ Início</a>
