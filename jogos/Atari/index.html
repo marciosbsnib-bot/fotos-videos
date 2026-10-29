@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Atari 2600 - webOS</title>
+  
+  <!-- JSZip via CDN para descompactar o .zip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
+  <!-- Core Javatari oficial via CDN para emulação real -->
+<script src="js/lib/javatari.js"></script>
+  
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    <h1>Atari 2600 <span>webOS</span></h1>
+    <p class="status-msg">Use o controle remoto da TV para selecionar o jogo</p>
+
+    <div class="main-container">
+      <div class="menu">
+        <button id="btn-enduro" onclick="App.carregarJogo('Enduro.zip', 'Enduro')">
+          🏎️ Enduro
+        </button>
+      </div>
+
+      <div id="screen-container">
+        <span id="info-tela">Selecione um jogo ao lado</span>
+<div id="javatari-screen"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/emu-core.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Sonic Classic - 3 Fases</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin-top: 20px;
+        }
+        canvas {
+            background: linear-gradient(to bottom, #4ea8de, #90e0ef);
+            display: block;
+            margin: 0 auto;
+            border: 4px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0px 0px 25px rgba(0, 150, 255, 0.4);
+        }
+        #info {
+            margin-top: 15px;
+            font-size: 18px;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Sonic The Hedgehog - Minimalista Clássico</h1>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="info">Use a tecla <b>ESPAÇO</b> para pular e desvie dos obstáculos!</div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const WIDTH = 800;
+        const HEIGHT = 400;
+
+        let player = {
+            x: 100,
+            y: 300,
+            width: 36,
+            height: 38,
+            vy: 0,
+            jump: -13,
+            gravity: 0.65,
+            isGrounded: true
+        };
+
+        let currentLevel = 1;
+        let score = 0;
+        let gameOver = false;
+        let won = false;
+
+        let obstacles = [];
+        let obstacleTimer = 0;
+        let loopObject = null; // O famoso arco de looping
+
+        function getLevelSettings(level) {
+            if (level === 1) return { name: "Green Hill Zone", sky: "#5390d9", ground: "#38b000", groundSub: "#2b9348", speed: 6, target: 500 };
+            if (level === 2) return { name: "Marble Zone", sky: "#e07a5f", ground: "#780000", groundSub: "#660708", speed: 8, target: 1000 };
+            return { name: "Scrap Brain Zone", sky: "#212529", ground: "#343a40", groundSub: "#495057", speed: 10, target: 1600 };
+        }
+
+        window.addEventListener("keydown", function(event) {
+            if (event.code === "Space") {
+                if (gameOver || won) {
+                    gameOver = false;
+                    won = false;
+                    currentLevel = 1;
+                    score = 0;
+                    player.y = 300;
+                    obstacles = [];
+                    loopObject = null;
+                } else if (player.isGrounded) {
+                    player.vy = player.jump;
+                    player.isGrounded = false;
+                }
+                event.preventDefault();
+            }
+        });
+
+        function spawnObstacle() {
+            let settings = getLevelSettings(currentLevel);
+            let types = ['spike', 'badnik'];
+            let chosenType = types[Math.floor(Math.random() * types.length)];
+            
+            let obs = {
+                x: WIDTH + 50,
+                y: 312,
+                width: 28,
+                height: 28,
+                type: chosenType
+            };
+
+            if (chosenType === 'badnik') {
+                obs.y = 250; // Robô voador
+                obs.width = 34;
+                obs.height = 24;
+            }
+
+            obstacles.push(obs);
+        }
+
+        function update() {
+            if (!gameOver && !won) {
+                player.vy += player.gravity;
+                player.y += player.vy;
+
+                if (player.y >= 300) {
+                    player.y = 300;
+                    player.vy = 0;
+                    player.isGrounded = true;
+                }
+
+                let settings = getLevelSettings(currentLevel);
+                
+                // Sistema de Spawn de Loopings periódicos na fase
+                if (!loopObject && Math.random() < 0.01 && score > 100 && score < settings.target - 200) {
+                    loopObject = {
+                        x: WIDTH + 50,
+                        y: 240,
+                        radius: 50,
+                        passed: false
+                    };
+                }
+
+                if (loopObject) {
+                    loopObject.x -= settings.speed;
+                    // Se passar pelo looping ganha pontos bônus
+                    if (!loopObject.passed && loopObject.x < player.x) {
+                        loopObject.passed = true;
+                        score += 150; // Bônus do looping!
+                    }
+                    if (loopObject.x < -100) {
+                        loopObject = null;
+                    }
+                }
+
+                // Gerenciador de obstáculos
+                obstacleTimer++;
+                if (obstacleTimer > Math.max(45, 95 - (currentLevel * 15))) {
+                    spawnObstacle();
+                    obstacleTimer = 0;
+                }
+
+                // Movimentar e checar colisão dos obstáculos
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    obstacles[i].x -= settings.speed;
+
+                    if (obstacles[i].x < -50) {
+                        obstacles.splice(i, 1);
+                        score += 20;
+                    } else {
+                        // Colisão precisa
+                        if (player.x < obstacles[i].x + obstacles[i].width &&
+                            player.x + player.width > obstacles[i].x &&
+                            player.y < obstacles[i].y + obstacles[i].height &&
+                            player.y + player.height > obstacles[i].y) {
+                            gameOver = true;
+                        }
+                    }
+                }
+
+                // Troca de fase
+                if (score >= settings.target) {
+                    if (currentLevel < 3) {
+                        currentLevel++;
+                        obstacles = [];
+                        loopObject = null;
+                    } else {
+                        won = true;
+                    }
+                }
+            }
+        }
+
+        function drawBackground(settings) {
+            // Céu
+            ctx.fillStyle = settings.sky;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Montanhas/Colinas clássicas ao fundo (Parallax simples)
+            ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+            ctx.beginPath();
+            ctx.moveTo(0, 340);
+            for (let i = 0; i <= WIDTH; i += 100) {
+                ctx.lineTo(i, 260 + Math.sin(i + Date.now() / 500) * 20);
+            }
+            ctx.lineTo(WIDTH, 340);
+            ctx.fill();
+
+            // Chão Principal
+            ctx.fillStyle = settings.ground;
+            ctx.fillRect(0, 340, WIDTH, 60);
+
+            // Detalhes xadrez do chão estilo Green Hill
+            ctx.fillStyle = settings.groundSub;
+            for (let i = 0; i < WIDTH; i += 40) {
+                ctx.fillRect(i, 340, 20, 20);
+                ctx.fillRect(i + 20, 360, 20, 20);
+            }
+        }
+
+        function drawSonic() {
+            // Espinhos traseiros do Ouriço (Sonic)
+            ctx.fillStyle = "#0051ff";
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y + 10);
+            ctx.lineTo(player.x - 12, player.y + 5);
+            ctx.lineTo(player.x - 6, player.y + 20);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(player.x + 5, player.y + 5);
+            ctx.lineTo(player.x - 10, player.y - 2);
+            ctx.lineTo(player.x, player.y + 15);
+            ctx.fill();
+
+            // Corpo principal (Azul)
+            ctx.fillStyle = "#0044ff";
+            ctx.fillRect(player.x, player.y, player.width, player.height - 6);
+
+            // Rosto e Barriga (Tom de pêssego/bege)
+            ctx.fillStyle = "#ffdbac";
+            ctx.fillRect(player.x + 18, player.y + 8, 16, 22);
+
+            // Olhos unidos característicos do Sonic
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(player.x + 22, player.y + 10, 10, 6);
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(player.x + 28, player.y + 11, 3, 4);
+
+            // Tênis Vermelhos com listra branca
+            ctx.fillStyle = "#d90429";
+            ctx.fillRect(player.x - 2, player.y + 32, 16, 8);
+            ctx.fillRect(player.x + 20, player.y + 32, 16, 8);
+            
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(player.x + 3, player.y + 34, 8, 4);
+            ctx.fillRect(player.x + 25, player.y + 34, 8, 4);
+        }
+
+        function drawLooping() {
+            if (loopObject) {
+                // Desenhando o arco do looping em estilo clássico de pista de corrida
+                ctx.strokeStyle = "#e9c46a";
+                ctx.lineWidth = 10;
+                ctx.beginPath();
+                ctx.arc(loopObject.x, loopObject.y, loopObject.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Detalhe interno do arco
+                ctx.strokeStyle = "#f4a261";
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(loopObject.x, loopObject.y, loopObject.radius - 6, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function drawObstacles() {
+            for (let obs of obstacles) {
+                if (obs.type === 'badnik') {
+                    // Robô vilão (Badnik)
+                    ctx.fillStyle = "#212529";
+                    ctx.beginPath();
+                    ctx.arc(obs.x + obs.width/2, obs.y + obs.height/2, obs.width/2, 0, Math.PI*2);
+                    ctx.fill();
+                    // Visor vermelho do robô
+                    ctx.fillStyle = "#ff0054";
+                    ctx.fillRect(obs.x + 8, obs.y + 8, 12, 8);
+                } else {
+                    // Espinhos clássicos
+                    ctx.fillStyle = "#adb5bd";
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x, obs.y + obs.height);
+                    ctx.lineTo(obs.x + obs.width / 2, obs.y);
+                    ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+        }
+
+        function draw() {
+            let settings = getLevelSettings(currentLevel);
+
+            drawBackground(settings);
+
+            if (!gameOver && !won) {
+                drawLooping();
+                drawSonic();
+                drawObstacles();
+
+                // Painel de Informações / Placar
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.fillRect(12, 12, 260, 75);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 15px 'Segoe UI', Arial";
+                ctx.fillText(`Fase ${currentLevel}: ${settings.name}`, 22, 38);
+                ctx.fillText(`Pontos: ${score} / ${settings.target}`, 22, 68);
+            } else if (gameOver) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                ctx.fillStyle = "#ff3366";
+                ctx.font = "bold 40px Arial";
+                ctx.fillText("GAME OVER", WIDTH / 2 - 110, HEIGHT / 2 - 20);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "20px Arial";
+                ctx.fillText("Pressione ESPAÇO para tentar novamente", WIDTH / 2 - 180, HEIGHT / 2 + 30);
+            } else if (won) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                ctx.fillStyle = "#2ec4b6";
+                ctx.font = "bold 40px Arial";
+                ctx.fillText("YOU WIN!", WIDTH / 2 - 80, HEIGHT / 2 - 20);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "20px Arial";
+                ctx.fillText("Parabéns! Você completou todas as zonas!", WIDTH / 2 - 190, HEIGHT / 2 + 30);
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
+    </script>
+
+</body>
+</html>

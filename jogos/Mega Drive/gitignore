@@ -1,0 +1,15 @@
+# ROMs de Sega Genesis/Mega Drive y saves (copyright, nunca se suben al repo)
+# Se ignora la carpeta roms/ completa para evitar cualquier conflicto entre
+# la extensión .md de las ROMs y los archivos .md de documentación (README, etc.)
+roms/
+*.gen
+*.smd
+*.bin
+*.zip
+*.7z
+*.sav
+*.state
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db

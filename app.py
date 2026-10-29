@@ -1,5 +1,8 @@
 import io
 import os
+import mimetypes
+import secrets
+from box_service import BoxService, BoxServiceError
 
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -496,7 +499,16 @@ def stream_media(media_id):
     # Suporte ao Google Drive
     if not media.drive_file_id:
         abort(404)
-        
+
+        # Suporte ao Box
+    if getattr(media, "box_file_id", None):
+        try:
+            box = BoxService()
+            download_url = box.download_url(media.box_file_id)
+            return redirect(download_url)
+        except BoxServiceError:
+            abort(503)  
+
     try:
         drive = DriveService()
         service = drive.client()
@@ -835,6 +847,150 @@ def admin_cloudinary_sync():
     return redirect(url_for("admin_cloudinary"))
 
 # ---------------- GOOGLE DRIVE ----------------
+
+
+# ---------------- BOX ----------------
+
+@app.get("/admin/box")
+@admin_required
+def admin_box():
+    connected = (
+        SiteSetting.query.filter_by(key="box_refresh_token").first()
+        is not None
+    )
+    return render_template("admin/box.html", connected=connected)
+
+
+@app.get("/admin/box/connect")
+@admin_required
+def admin_box_connect():
+    try:
+        box = BoxService()
+        state = secrets.token_urlsafe(32)
+        session["box_oauth_state"] = state
+        return redirect(box.authorization_url(state))
+    except BoxServiceError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("admin_box"))
+
+
+@app.get("/admin/box/callback")
+@admin_required
+def admin_box_callback():
+    expected_state = session.pop("box_oauth_state", None)
+    received_state = request.args.get("state")
+    code = request.args.get("code")
+
+    if request.args.get("error"):
+        flash("A autorização do Box foi cancelada ou recusada.", "error")
+        return redirect(url_for("admin_box"))
+
+    if not expected_state or received_state != expected_state:
+        flash("Estado OAuth inválido. Tente conectar novamente.", "error")
+        return redirect(url_for("admin_box"))
+
+    if not code:
+        flash("O Box não retornou o código de autorização.", "error")
+        return redirect(url_for("admin_box"))
+
+    try:
+        BoxService().handle_callback(code)
+        audit("BOX_CONNECTED")
+        flash("Conta Box conectada com sucesso.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception("Falha na autorização do Box")
+        flash(f"Não foi possível conectar ao Box: {exc}", "error")
+
+    return redirect(url_for("admin_box"))
+
+
+@app.post("/admin/box/sync")
+@admin_required
+def admin_box_sync():
+    folder_id = request.form.get("folder_id", "0").strip() or "0"
+    album_name = request.form.get("album_name", "").strip()
+    classification = request.form.get("classification", "PUBLIC")
+
+    if not album_name or classification not in {
+        "PUBLIC", "NORMAL", "RESTRICTED"
+    }:
+        flash("Informe o nome do álbum e uma classificação válida.", "error")
+        return redirect(url_for("admin_box"))
+
+    try:
+        box = BoxService()
+        files = box.list_folder(folder_id)
+
+        album = Album.query.filter_by(name=album_name).first()
+        if not album:
+            album = Album(
+                name=album_name,
+                access_classification=classification,
+            )
+            db.session.add(album)
+            db.session.flush()
+        else:
+            album.access_classification = classification
+
+        count = 0
+
+        for item in files:
+            file_id = item.get("id")
+            name = item.get("name", "Sem nome")
+
+            if not file_id:
+                continue
+
+            mime_type = mimetypes.guess_type(name)[0] or ""
+            if not (
+                mime_type.startswith("image/")
+                or mime_type.startswith("video/")
+            ):
+                continue
+
+            media = Media.query.filter_by(box_file_id=file_id).first()
+
+            if not media:
+                media = Media(
+                    album_id=album.id,
+                    box_file_id=file_id,
+                    name=name,
+                    mime_type=mime_type,
+                    access_classification=classification,
+                )
+                db.session.add(media)
+                count += 1
+            else:
+                media.album_id = album.id
+                media.name = name
+                media.mime_type = mime_type
+                media.access_classification = classification
+
+        db.session.commit()
+
+        audit(
+            "BOX_SYNC",
+            details={
+                "folder_id": folder_id,
+                "album_name": album_name,
+                "files_added": count,
+            },
+        )
+
+        flash(
+            f"Sincronização do Box concluída: {count} novos arquivos "
+            f"adicionados ao álbum '{album_name}'.",
+            "success",
+        )
+
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception("Falha na sincronização do Box")
+        flash(f"Falha ao sincronizar o Box: {exc}", "error")
+
+    return redirect(url_for("admin_box"))
+
 
 @app.get("/admin/drive")
 @admin_required

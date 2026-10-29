@@ -21,7 +21,7 @@
        src="{{ item.mural_thumbnail_url or item.thumbnail_url }}"
        alt="Vídeo Cloudinary"
        loading="lazy">
-            {% else %}
+            {% else %} 
               <!-- VÍDEO DO GOOGLE DRIVE: faz stream com o parâmetro #t=0.5 para carregar o 1º frame -->
               <video class="media-preview" preload="metadata" muted playsinline>
                 <source src="{{ url_for('stream_media', media_id=item.id) }}#t=0.5" type="{{ item.mime_type or 'video/mp4' }}">

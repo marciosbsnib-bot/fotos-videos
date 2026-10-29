@@ -1,0 +1,72 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>Box</h1>
+    <p class="muted">
+      Consulte fotos e vídeos armazenados na sua conta Box.
+    </p>
+  </div>
+</header>
+
+<div class="settings-card">
+  {% if connected %}
+    <p class="success-text">✓ Conta Box conectada.</p>
+  {% else %}
+    <p>O Box ainda não está conectado.</p>
+  {% endif %}
+
+  <a class="primary button" href="{{ url_for('admin_box_connect') }}">
+    {{ "Reconectar Box" if connected else "Conectar Box" }}
+  </a>
+
+  <hr>
+
+  <h2>Sincronizar arquivos</h2>
+
+  <p class="muted">
+    A sincronização registra os metadados no banco. Ela não envia
+    nem copia os arquivos para outro serviço.
+    São importadas imagens e vídeos diretamente da pasta informada.
+  </p>
+
+  <form class="settings-card"
+        method="post"
+        action="{{ url_for('admin_box_sync') }}">
+
+    <input type="hidden"
+           name="csrf_token"
+           value="{{ csrf_token() }}">
+
+    <label>
+      ID da pasta Box
+      <input name="folder_id"
+             required
+             value="0"
+             placeholder="0 para a raiz da conta">
+    </label>
+
+    <label>
+      Nome do álbum no site
+      <input name="album_name"
+             required
+             placeholder="Fotos da Família">
+    </label>
+
+    <label>
+      Classificação
+      <select name="classification">
+        <option value="PUBLIC">Público</option>
+        <option value="NORMAL">Normal</option>
+        <option value="RESTRICTED">Restrito</option>
+      </select>
+    </label>
+
+    <button class="primary" type="submit">
+      Sincronizar pasta do Box
+    </button>
+  </form>
+</div>
+{% endblock %}

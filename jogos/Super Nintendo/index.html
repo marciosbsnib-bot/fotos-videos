@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Super Nintendo Web</title>
+<style>
+  body { background:#111; color:#eee; font-family:sans-serif; text-align:center; margin:0; padding:20px; }
+  #game-wrap { position:relative; width:100%; max-width:720px; height:480px; margin:20px auto; }
+  #game { width:100%; height:100%; background:#000; }
+  input[type=file] { margin-top:10px; }
+  #status { margin-top:10px; color:#8f8; font-size:14px; }
+  #help { max-width:520px; margin:25px auto; text-align:left; background:#1c1c1c; border-radius:8px; padding:15px 20px; }
+  #help h3 { margin-top:0; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td, th { padding:4px 8px; border-bottom:1px solid #333; text-align:left; }
+  code { background:#333; padding:1px 5px; border-radius:3px; }
+
+  #toggle-pad, #toggle-speed, #pad-bigger, #pad-smaller { margin-top:15px; padding:8px 16px; background:#2a6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:14px; }
+  #toggle-pad:hover, #toggle-speed:hover, #pad-bigger:hover, #pad-smaller:hover { background:#3b8; }
+  #toggle-speed.active { background:#c60; }
+  #toggle-speed.active:hover { background:#e80; }
+  #pad-bigger, #pad-smaller { padding:8px 14px; font-weight:bold; }
+  #controls-bar { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+
+  /* Pad transparente superpuesto sobre la pantalla del juego */
+  #pad { display:none; position:absolute; inset:0; user-select:none; pointer-events:none; z-index:10; --pad-scale:1; }
+  #pad.fullscreen-pad { position:fixed; z-index:2147483647; }
+  #pad button { pointer-events:auto; border-radius:50%; border:2px solid #000; background:rgba(255,255,255,0.28); backdrop-filter:blur(1px); color:#000; font-weight:bold; cursor:pointer; transition:width 0.1s, height 0.1s; }
+  #pad button:active, #pad button.pressed { background:rgba(255,255,255,0.55); }
+
+  #pad .dpad { position:absolute; left:16px; bottom:16px; width:calc(150px * var(--pad-scale)); height:calc(150px * var(--pad-scale)); }
+  #pad .dpad button { position:absolute; width:calc(50px * var(--pad-scale)); height:calc(50px * var(--pad-scale)); font-size:calc(14px * var(--pad-scale)); }
+  #pad .dpad button[data-key="ArrowUp"]    { top:0;    left:calc(50px * var(--pad-scale)); }
+  #pad .dpad button[data-key="ArrowDown"]  { bottom:0; left:calc(50px * var(--pad-scale)); }
+  #pad .dpad button[data-key="ArrowLeft"]  { top:calc(50px * var(--pad-scale)); left:0; }
+  #pad .dpad button[data-key="ArrowRight"] { top:calc(50px * var(--pad-scale)); right:0; }
+
+  /* Diamante A/B/X/Y como en el control original de SNES */
+  #pad .action { position:absolute; right:16px; bottom:16px; width:calc(130px * var(--pad-scale)); height:calc(130px * var(--pad-scale)); }
+  #pad .action button { position:absolute; width:calc(40px * var(--pad-scale)); height:calc(40px * var(--pad-scale)); font-size:calc(13px * var(--pad-scale)); }
+  #pad .action button[data-key="a"] { top:0; left:calc(45px * var(--pad-scale)); }
+  #pad .action button[data-key="s"] { top:calc(45px * var(--pad-scale)); left:0; }
+  #pad .action button[data-key="z"] { top:calc(45px * var(--pad-scale)); left:calc(90px * var(--pad-scale)); }
+  #pad .action button[data-key="x"] { top:calc(90px * var(--pad-scale)); left:calc(45px * var(--pad-scale)); }
+
+  #pad .shoulders { position:absolute; top:10px; left:0; right:0; display:flex; justify-content:space-between; padding:0 10px; }
+  #pad .shoulders button { position:static; width:calc(56px * var(--pad-scale)); height:calc(34px * var(--pad-scale)); border-radius:8px; }
+
+  #pad .center { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:calc(10px * var(--pad-scale)); }
+  #pad .center button { position:static; width:calc(70px * var(--pad-scale)); height:calc(30px * var(--pad-scale)); border-radius:15px; font-size:calc(12px * var(--pad-scale)); }
+</style>
+</head>
+<body>
+  <h2>Super Nintendo Web (core snes9x vía EmulatorJS)</h2>
+  <input type="file" id="rom" accept=".sfc,.smc,.fig,.swc,.zip">
+  <div id="status"></div>
+
+  <div id="game-wrap">
+    <div id="game"></div>
+
+    <div id="pad">
+      <div class="shoulders">
+        <button data-key="q">L</button>
+        <button data-key="e">R</button>
+      </div>
+
+      <div class="dpad">
+        <button data-key="ArrowUp">▲</button>
+        <button data-key="ArrowDown">▼</button>
+        <button data-key="ArrowLeft">◀</button>
+        <button data-key="ArrowRight">▶</button>
+      </div>
+
+      <div class="action">
+        <button data-key="a">X</button>
+        <button data-key="s">Y</button>
+        <button data-key="z">A</button>
+        <button data-key="x">B</button>
+      </div>
+
+      <div class="center">
+        <button data-key="v">Select</button>
+        <button data-key="Enter">Start</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls-bar">
+    <button id="toggle-pad">Mostrar controles en pantalla</button>
+    <button id="toggle-speed">x2 (avance rápido)</button>
+    <button id="pad-smaller">− Botones más chicos</button>
+    <button id="pad-bigger">Botones más grandes +</button>
+  </div>
+
+  <div id="help">
+    <h3>Controles por teclado (default)</h3>
+    <table>
+      <tr><th>Botón SNES</th><th>Tecla</th></tr>
+      <tr><td>D-pad</td><td>Flechas ↑ ↓ ← →</td></tr>
+      <tr><td>A</td><td><code>Z</code></td></tr>
+      <tr><td>B</td><td><code>X</code></td></tr>
+      <tr><td>X</td><td><code>A</code></td></tr>
+      <tr><td>Y</td><td><code>S</code></td></tr>
+      <tr><td>L</td><td><code>Q</code></td></tr>
+      <tr><td>R</td><td><code>E</code></td></tr>
+      <tr><td>Start</td><td><code>Enter</code></td></tr>
+      <tr><td>Select</td><td><code>V</code></td></tr>
+      <tr><td>Guardado rápido</td><td><code>1</code></td></tr>
+      <tr><td>Carga rápida</td><td><code>2</code></td></tr>
+      <tr><td>Cambiar slot</td><td><code>3</code></td></tr>
+      <tr><td>Avance rápido</td><td><code>+</code> (numpad)</td></tr>
+    </table>
+    <p><b>Cambiar teclas:</b> con el juego cargado, pasá el mouse arriba de la pantalla, abrí el menú del emulador (ícono de engranaje) → <b>Control Settings</b>.</p>
+    <p><b>Controles en pantalla:</b> "Mostrar controles en pantalla" superpone un pad digital transparente sobre la pantalla del juego, con contorno negro. Sigue visible en fullscreen.</p>
+    <p><b>Velocidad x2:</b> el botón "x2 (avance rápido)" activa/desactiva el fast-forward con un click.</p>
+    <p><b>Tamaño de los botones:</b> "Botones más grandes +" y "Botones más chicos −" ajustan el pad digital.</p>
+    <p><b>Guardar la partida:</b> además del guardado rápido (<code>1</code>/<code>2</code>), el menú del emulador tiene Save State / Load State, persistente en el navegador según el nombre de la ROM.</p>
+  </div>
+
+<script>
+document.getElementById('rom').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  document.getElementById('status').textContent = 'Cargando ' + file.name + '...';
+
+  const url = URL.createObjectURL(file);
+  const gameId = 'snes_' + file.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+  window.EJS_player = '#game';
+  window.EJS_core = 'snes';
+  window.EJS_gameUrl = url;
+  window.EJS_gameName = file.name;
+  window.EJS_gameID = gameId;
+  window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+  window.EJS_startOnLoaded = true;
+
+  const prev = document.getElementById('ejs-loader');
+  if (prev) prev.remove();
+  document.getElementById('game').innerHTML = '';
+
+  const script = document.createElement('script');
+  script.id = 'ejs-loader';
+  script.src = window.EJS_pathtodata + 'loader.js';
+  script.onload = () => { document.getElementById('status').textContent = 'Emulador cargado: ' + file.name; };
+  script.onerror = () => { document.getElementById('status').textContent = 'Error cargando el emulador. Revisá la conexión a internet.'; };
+  document.body.appendChild(script);
+});
+
+// Botón para mostrar/ocultar el pad digital en pantalla
+const toggleBtn = document.getElementById('toggle-pad');
+const pad = document.getElementById('pad');
+toggleBtn.addEventListener('click', () => {
+  const visible = pad.style.display === 'block';
+  pad.style.display = visible ? 'none' : 'block';
+  toggleBtn.textContent = visible ? 'Mostrar controles en pantalla' : 'Ocultar controles en pantalla';
+});
+
+// Cada botón del pad simula la tecla correspondiente (mismo mapeo default de EmulatorJS)
+const KEY_CODES = {
+  ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39,
+  Enter: 13, z: 90, x: 88, v: 86, q: 81, e: 69, s: 83, a: 65
+};
+
+function dispatchKey(type, key) {
+  const keyCode = KEY_CODES[key] || 0;
+  const event = new KeyboardEvent(type, { key: key, code: key, keyCode: keyCode, which: keyCode, bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'keyCode', { get: () => keyCode });
+  Object.defineProperty(event, 'which', { get: () => keyCode });
+
+  const target = document.querySelector('#game canvas') || document.getElementById('game') || document;
+  target.dispatchEvent(event);
+  document.dispatchEvent(event);
+  window.dispatchEvent(event);
+}
+document.querySelectorAll('#pad button[data-key]').forEach(btn => {
+  const key = btn.dataset.key;
+  const press = (ev) => { ev.preventDefault(); btn.classList.add('pressed'); dispatchKey('keydown', key); };
+  const release = (ev) => { ev.preventDefault(); btn.classList.remove('pressed'); dispatchKey('keyup', key); };
+  btn.addEventListener('mousedown', press);
+  btn.addEventListener('mouseup', release);
+  btn.addEventListener('mouseleave', release);
+  btn.addEventListener('touchstart', press, { passive: false });
+  btn.addEventListener('touchend', release);
+});
+
+// Botón x2: mantiene "apretada" la tecla de avance rápido (+ del numpad) como toggle
+const speedBtn = document.getElementById('toggle-speed');
+let fastForwardOn = false;
+speedBtn.addEventListener('click', () => {
+  fastForwardOn = !fastForwardOn;
+  const event = new KeyboardEvent(fastForwardOn ? 'keydown' : 'keyup', {
+    key: '+', code: 'NumpadAdd', keyCode: 107, which: 107, bubbles: true, cancelable: true
+  });
+  Object.defineProperty(event, 'keyCode', { get: () => 107 });
+  Object.defineProperty(event, 'which', { get: () => 107 });
+  const target = document.querySelector('#game canvas') || document.getElementById('game') || document;
+  target.dispatchEvent(event);
+  document.dispatchEvent(event);
+  window.dispatchEvent(event);
+
+  speedBtn.classList.toggle('active', fastForwardOn);
+  speedBtn.textContent = fastForwardOn ? 'x1 (velocidad normal)' : 'x2 (avance rápido)';
+});
+
+// Botones +/- para agrandar o achicar el pad digital
+const PAD_SCALE_MIN = 0.6;
+const PAD_SCALE_MAX = 1.8;
+const PAD_SCALE_STEP = 0.15;
+let padScale = 1;
+function applyPadScale() {
+  pad.style.setProperty('--pad-scale', padScale.toFixed(2));
+}
+document.getElementById('pad-bigger').addEventListener('click', () => {
+  padScale = Math.min(PAD_SCALE_MAX, padScale + PAD_SCALE_STEP);
+  applyPadScale();
+});
+document.getElementById('pad-smaller').addEventListener('click', () => {
+  padScale = Math.max(PAD_SCALE_MIN, padScale - PAD_SCALE_STEP);
+  applyPadScale();
+});
+
+// El botón de fullscreen de EmulatorJS pone en pantalla completa su propio
+// contenedor, así que el pad queda afuera y no se ve. Lo movemos mientras dure.
+const padOriginalParent = pad.parentElement;
+document.addEventListener('fullscreenchange', () => {
+  const fsEl = document.fullscreenElement;
+  if (fsEl && fsEl !== padOriginalParent) {
+    fsEl.appendChild(pad);
+    pad.classList.add('fullscreen-pad');
+  } else {
+    padOriginalParent.appendChild(pad);
+    pad.classList.remove('fullscreen-pad');
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "id": "com.seuusuario.atari2600",
+  "version": "1.0.0",
+  "vendor": "SeuNome",
+  "type": "web",
+  "main": "index.html",
+  "title": "Atari 2600 webOS",
+  "icon": "icon.png",
+  "requiredPermissions": []
+}
